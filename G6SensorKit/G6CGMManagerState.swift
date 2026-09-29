@@ -131,6 +131,24 @@ public struct G6CGMManagerState: RawRepresentable {
         return millivolts <= Self.batteryVeryLowMillivolts
     }
 
+    /// Headline battery level for the settings row.
+    public enum BatteryLevel {
+        case unknown, high, low, veryLow
+    }
+
+    public var batteryLevel: BatteryLevel {
+        guard let millivolts = batteryVoltageBMillivolts else {
+            return .unknown
+        }
+        if millivolts <= Self.batteryVeryLowMillivolts {
+            return .veryLow
+        }
+        if millivolts <= Self.batteryLowMillivolts {
+            return .low
+        }
+        return .high
+    }
+
     public init(
         transmitterID: String,
         peripheralIdentifier: UUID? = nil,
@@ -308,7 +326,14 @@ public struct G6CGMManagerState: RawRepresentable {
         return sensorStartDate?.addingTimeInterval(sensorLife)
     }
 
+    /// Unknown until the first version read: the fallback constants in
+    /// `transmitterLifetime` are guesses (a 180-day Anubis would alert as
+    /// "expired" against the stock 90 days), so no expiry is reported before
+    /// the transmitter's own value is in.
     public var transmitterExpirationDate: Date? {
+        guard transmitterExpiryInDays != nil else {
+            return nil
+        }
         return transmitterStartDate?.addingTimeInterval(transmitterLifetime)
     }
 
@@ -338,11 +363,9 @@ public struct G6CGMManagerState: RawRepresentable {
     /// The device model implied by the transmitter ID prefix. G6 transmitters
     /// use `8…`; Dexcom ONE uses `5…` or `C…`.
     public var deviceModel: String {
-        switch transmitterID.first {
-        case "5", "C", "c":
-            return "Dexcom ONE"
-        default:
-            return "Dexcom G6"
+        switch G6TransmitterModel(transmitterID: transmitterID) {
+        case .g6: return "Dexcom G6"
+        case .one: return "Dexcom ONE"
         }
     }
 }

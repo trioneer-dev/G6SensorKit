@@ -5,8 +5,10 @@
 //  Adapted for G6SensorKit from CGMBLEKit, created by Pete Schwamb on 9/11/23.
 //  Copyright © 2023 LoopKit Authors. All rights reserved. (MIT License)
 //
-//  Adaptations: LoopKit-free (RawValue is a plain [String: Any]);
-//  `passiveModeEnabled` removed — G6SensorKit is active/native mode only.
+//  Adaptations: LoopKit-free (RawValue is a plain [String: Any]).
+//  `passiveModeEnabled` lives in G6CGMManagerState (the integration layer's
+//  persisted state); this struct keeps CGMBLEKit's key names so its rawValue
+//  doubles as the legacy-state reference shape for migration.
 //
 
 import Foundation
@@ -69,7 +71,7 @@ public struct TransmitterManagerState: RawRepresentable, Equatable {
         let sensorStartOffset = rawValue["sensorStartOffset"] as? UInt32
 
         let transmitterExpiryInDays = (rawValue["transmitterExpiryInDays"] as? UInt16)
-            ?? (rawValue["transmitterExpiryInDays"] as? Int).map { UInt16($0) }
+            ?? (rawValue["transmitterExpiryInDays"] as? Int).map { UInt16(clamping: $0) }
 
         let sensorLifeDays = rawValue["sensorLifeDays"] as? Int ?? Self.defaultSensorLifeDays
 

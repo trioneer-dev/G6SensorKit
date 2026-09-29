@@ -43,9 +43,19 @@ extension G6CGMManager {
                 // warming up.
                 state.transmitterStartDate = now.addingTimeInterval(-.hours(24 * 12))
                 state.sensorStartDate = now.addingTimeInterval(-(state.warmupPeriod - Self.simulatedWarmupRemaining))
-                state.transmitterExpiryInDays = 90
+                // 180 days so the simulator presents as an Anubis, making the
+                // longer session length and expiry visible in the UI.
+                state.transmitterExpiryInDays = 180
                 state.firmwareVersion = "1.0.0.0 (simulated)"
                 state.peripheralIdentifier = UUID()
+                // A healthy battery, so the settings row renders and no
+                // low-battery alert fires.
+                state.batteryVoltageA = 295
+                state.batteryVoltageB = 282
+                state.batteryResistance = 700
+                state.batteryRuntimeDays = 12
+                state.batteryTemperature = 31
+                state.lastBatteryReadDate = now
             }
 
             self.scheduleSimulatedReadings()
@@ -64,6 +74,9 @@ extension G6CGMManager {
     }
 
     private func emitSimulatedReading() {
+        // No active session (ended, or not yet started): stay quiet.
+        guard state.sensorStartDate != nil else { return }
+
         guard !state.isInWarmup else {
             // Still warming up: the state change alone refreshes the UI.
             notifySimulationObservers()

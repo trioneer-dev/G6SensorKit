@@ -22,6 +22,7 @@ final class G6SettingsViewModel: ObservableObject, G6CGMManagerObserver {
 
     let toCalibration: () -> Void
     let toTransmitterDetails: () -> Void
+    let toBatteryDetails: () -> Void
     let toSensorLifeSettings: () -> Void
     let toShareUpload: () -> Void
     let toReadingDetail: () -> Void
@@ -35,6 +36,7 @@ final class G6SettingsViewModel: ObservableObject, G6CGMManagerObserver {
         cgmManager: G6CGMManager,
         toCalibration: @escaping () -> Void,
         toTransmitterDetails: @escaping () -> Void,
+        toBatteryDetails: @escaping () -> Void,
         toSensorLifeSettings: @escaping () -> Void,
         toShareUpload: @escaping () -> Void,
         toReadingDetail: @escaping () -> Void,
@@ -46,6 +48,7 @@ final class G6SettingsViewModel: ObservableObject, G6CGMManagerObserver {
         state = cgmManager.state
         self.toCalibration = toCalibration
         self.toTransmitterDetails = toTransmitterDetails
+        self.toBatteryDetails = toBatteryDetails
         self.toSensorLifeSettings = toSensorLifeSettings
         self.toShareUpload = toShareUpload
         self.toReadingDetail = toReadingDetail
@@ -151,15 +154,17 @@ final class G6SettingsViewModel: ObservableObject, G6CGMManagerObserver {
     }
 
     var trendSymbol: String? {
-        guard let rate = state.latestReading?.trendRateMgDLPerMinute, !isSignalLost else {
+        guard !isSignalLost,
+              let arrow = G6TrendArrow(dexcomRateMgDLPerMinute: state.latestReading?.trendRateMgDLPerMinute)
+        else {
             return nil
         }
-        switch rate {
-        case ..<(-3): return "arrow.down"
-        case ..<(-1): return "arrow.down.right"
-        case ..<1: return "arrow.right"
-        case ..<3: return "arrow.up.right"
-        default: return "arrow.up"
+        switch arrow {
+        case .downDownDown, .downDown: return "arrow.down"
+        case .down: return "arrow.down.right"
+        case .flat: return "arrow.right"
+        case .up, .upUp: return "arrow.up.right"
+        case .upUpUp: return "arrow.up"
         }
     }
 
@@ -176,6 +181,22 @@ final class G6SettingsViewModel: ObservableObject, G6CGMManagerObserver {
 
     var canCalibrate: Bool {
         state.sensorStartDate != nil && !state.isInWarmup
+    }
+
+    /// Headline battery level for the settings row; nil until the first
+    /// battery read, so the row stays hidden for transmitters we have
+    /// never heard battery from.
+    var batteryLevelText: String? {
+        switch state.batteryLevel {
+        case .unknown:
+            return nil
+        case .high:
+            return LocalizedString("High", comment: "Battery level: high")
+        case .low:
+            return LocalizedString("Low", comment: "Battery level: low")
+        case .veryLow:
+            return LocalizedString("Replace Now", comment: "Battery level: very low, replace transmitter")
+        }
     }
 
     var canStartSensor: Bool {
@@ -250,7 +271,11 @@ struct G6SettingsView: View {
         Section {
             HStack {
                 Spacer()
-                G6TransmitterImage(size: 200, isActive: viewModel.phase == .active)
+                G6TransmitterImage(
+                    size: 200,
+                    isActive: viewModel.phase == .active,
+                    assetName: viewModel.state.isAnubis ? "anubis" : "G6Transmitter"
+                )
                 Spacer()
             }
             .listRowBackground(Color.clear)
@@ -398,7 +423,11 @@ struct G6SettingsView: View {
 
     private var actionsSection: some View {
         Section {
-            if viewModel.canStartSensor {
+            if viewModel.state.passiveModeEnabled {
+                Label(LocalizedString("Sessions and calibrations are managed in the Dexcom app while passive mode is on.", comment: "Explanation replacing the session action buttons in passive mode"), systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if viewModel.canStartSensor {
                 Button {
                     viewModel.toPlacementGuide()
                 } label: {
@@ -440,7 +469,7 @@ struct G6SettingsView: View {
                 }
             }
         } footer: {
-            if viewModel.state.isInWarmup {
+            if viewModel.state.isInWarmup, !viewModel.state.passiveModeEnabled {
                 Text(LocalizedString("Calibration becomes available once warm-up finishes. Do not make insulin decisions from early readings — use a fingerstick meter and follow your care team's guidance.", comment: "Footer explaining warm-up restrictions"))
             }
         }
@@ -456,7 +485,22 @@ struct G6SettingsView: View {
 
             navRow(LocalizedString("Transmitter Details", comment: "Row to transmitter details"), "cpu", viewModel.toTransmitterDetails)
 
-            if viewModel.state.isAnubis {
+            if let batteryLevel = viewModel.batteryLevelText {
+                Button(action: viewModel.toBatteryDetails) {
+                    HStack {
+                        Label(LocalizedString("Battery", comment: "Row to transmitter battery details"), systemImage: "battery.75")
+                        Spacer()
+                        Text(batteryLevel)
+                            .foregroundColor(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(G6RowButtonStyle())
+            }
+
+            if viewModel.state.isAnubis, !viewModel.state.passiveModeEnabled {
                 navRow(LocalizedString("Session Length", comment: "Row to session length settings"), "calendar", viewModel.toSensorLifeSettings)
             }
 

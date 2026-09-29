@@ -19,6 +19,21 @@ import LoopKitUI
 import G6SensorKit
 import G6SensorCore
 
+#if targetEnvironment(simulator)
+/// Simulator stand-in for the camera scanner, which needs hardware the
+/// simulator lacks: the scan buttons stay visible there and deliver a
+/// fixed payload, so the whole scan flow can be exercised without a
+/// device. Compiled out on hardware. Both payloads are real, public
+/// Dexcom packaging data (the same ones the parser tests use).
+enum G6DemoScan {
+    /// The full Data Matrix from a public G6 transmitter box photo.
+    static let transmitterBox = G6PackageScan(payload:
+        "241STT-OM-001\u{1D}1018038762\u{1D}2188H03B\u{1D}17250226")
+    /// A real, public G6 applicator label.
+    static let applicator = G6PackageScan(payload: "10731863521434687D2405937")
+}
+#endif
+
 // MARK: - Shared building blocks
 
 /// A numbered instruction row used by the placement guide.
@@ -74,12 +89,82 @@ struct G6ContinueButton: View {
     }
 }
 
+/// Large per-character boxes over a hidden text field that does the real
+/// input. Shared by the transmitter-ID screen (6 boxes, alphanumeric)
+/// and the sensor-code screen (4 boxes, numeric).
+struct G6CodeBoxField: View {
+    enum AllowedCharacters {
+        case alphanumericUppercased
+        case numeric
+    }
+
+    @Binding var text: String
+    let length: Int
+    let allowedCharacters: AllowedCharacters
+    var focused: FocusState<Bool>.Binding
+
+    private var filteredText: Binding<String> {
+        Binding(
+            get: { text },
+            set: { newValue in
+                let filtered: String
+                switch allowedCharacters {
+                case .alphanumericUppercased:
+                    filtered = newValue.filter { $0.isLetter || $0.isNumber }.uppercased()
+                case .numeric:
+                    filtered = newValue.filter(\.isNumber)
+                }
+                text = String(filtered.prefix(length))
+            }
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            TextField("", text: filteredText)
+                .focused(focused)
+                .keyboardType(allowedCharacters == .alphanumericUppercased ? .asciiCapable : .numberPad)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(allowedCharacters == .alphanumericUppercased ? .characters : .never)
+                .foregroundColor(.clear)
+                .accentColor(.clear)
+                .opacity(0.02)
+
+            HStack(spacing: 10) {
+                ForEach(0 ..< length, id: \.self) { index in
+                    let characters = Array(text)
+                    let character = index < characters.count ? String(characters[index]) : ""
+                    let isActive = index == characters.count
+
+                    Text(character)
+                        .font(.title.weight(.semibold).monospaced())
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 64)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color(.secondarySystemGroupedBackground))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(isActive ? Color.accentColor : Color(.separator), lineWidth: isActive ? 2 : 1)
+                        )
+                }
+            }
+            .allowsHitTesting(false)
+        }
+        .frame(height: 64)
+        .contentShape(Rectangle())
+        .onTapGesture { focused.wrappedValue = true }
+    }
+}
+
 // MARK: - 1. Introduction
 
 /// Product hero, in the shape G7SensorKit uses: name, device, a short
-/// statement of what this driver does, then Continue. The wording is the
-/// inverse of G7's — that one piggybacks the manufacturer's app, this one
-/// replaces it, and getting that distinction wrong would be dangerous.
+/// statement of what this driver does, then Continue. The mode distinction
+/// (direct vs. listening to the Dexcom app) is introduced here and chosen on
+/// the connection-mode screen — getting that distinction wrong in the copy
+/// would be dangerous.
 struct G6IntroductionView: View {
     let didContinue: () -> Void
 
@@ -97,12 +182,9 @@ struct G6IntroductionView: View {
 
                 VStack(spacing: 14) {
                     Text(String(
-                        format: LocalizedString("%1$@ talks to your G6 or Dexcom ONE transmitter directly. It starts and stops sensor sessions, sends your calibrations, and fills in readings it missed.", comment: "Introduction: what the native driver does (1: app name)"),
+                        format: LocalizedString("%1$@ reads glucose from your G6 or Dexcom ONE transmitter over Bluetooth — either by talking to the transmitter itself, or by listening to the Dexcom app's session. You choose on the next screens.", comment: "Introduction: what the driver does (1: app name)"),
                         appName
                     ))
-
-                    Text(LocalizedString("You do not need the Dexcom app — and you must not let it use the same transmitter at the same time.", comment: "Introduction: single-app requirement"))
-                        .foregroundStyle(.secondary)
                 }
                 .font(.body)
                 .multilineTextAlignment(.leading)
@@ -164,6 +246,94 @@ struct G6CalloutBox: View {
     }
 }
 
+// MARK: - 3. Connection mode
+
+/// Lets the user choose between owning the transmitter (direct) and
+/// listening to the Dexcom app's session (passive). Direct is presented as
+/// the recommendation; passive exists for people who want to keep the
+/// manufacturer's app running.
+struct G6ConnectionModeView: View {
+    @State private var usePassive: Bool
+    let didContinue: (Bool) -> Void
+
+    init(initialPassive: Bool, didContinue: @escaping (Bool) -> Void) {
+        _usePassive = State(initialValue: initialPassive)
+        self.didContinue = didContinue
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text(LocalizedString("Choose how to connect", comment: "Connection mode screen heading"))
+                        .font(.title2.bold())
+
+                    modeCard(
+                        title: LocalizedString("Direct", comment: "Connection mode option: direct"),
+                        badge: LocalizedString("Recommended", comment: "Badge on the recommended connection mode"),
+                        description: LocalizedString("This app talks to the transmitter itself: start and stop sensor sessions, enter sensor codes and calibrations here. The Dexcom app must not be connected to this transmitter.", comment: "Direct mode explanation"),
+                        symbolName: "antenna.radiowaves.left.and.right",
+                        isSelected: !usePassive
+                    ) {
+                        usePassive = false
+                    }
+
+                    modeCard(
+                        title: LocalizedString("Listen to the Dexcom app", comment: "Connection mode option: passive"),
+                        badge: nil,
+                        description: LocalizedString("This app listens to the session the Dexcom G6 or ONE app drives on this phone. The Dexcom app is required, and sessions, sensor codes and calibrations are managed there.", comment: "Passive mode explanation"),
+                        symbolName: "ear.badge.waveform",
+                        isSelected: usePassive
+                    ) {
+                        usePassive = true
+                    }
+                }
+                .padding()
+            }
+
+            G6ContinueButton(action: { didContinue(usePassive) })
+        }
+    }
+
+    private func modeCard(title: String, badge: String?, description: String, symbolName: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: symbolName)
+                        .foregroundColor(isSelected ? Color.accentColor : .secondary)
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    if let badge = badge {
+                        Text(badge)
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor)
+                            .cornerRadius(6)
+                    }
+                    Spacer()
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(isSelected ? Color.accentColor : Color(.separator))
+                }
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - 2. Transmitter ID
 
 struct G6TransmitterIDEntryView: View {
@@ -172,6 +342,10 @@ struct G6TransmitterIDEntryView: View {
 
     @State private var transmitterID: String = ""
     @State private var validationMessage: String?
+    @State private var showScanner = false
+    @State private var showCameraDeniedAlert = false
+    @State private var scanFailedMessage: String?
+    @FocusState private var fieldFocused: Bool
 
     init(initialValue: String, didSubmit: @escaping (String) -> Void) {
         self.initialValue = initialValue
@@ -202,24 +376,46 @@ struct G6TransmitterIDEntryView: View {
                         G6TransmitterBackGlyph(size: 150)
                     }
 
-                    TextField(LocalizedString("6-character ID", comment: "Transmitter ID text field placeholder"), text: $transmitterID)
-                        .textCase(.uppercase)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.characters)
-                        .font(.title3.monospaced())
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(10)
-                        .onChange(of: transmitterID) { newValue in
-                            transmitterID = String(newValue.uppercased().prefix(6))
-                            validationMessage = nil
-                        }
+                    G6CodeBoxField(
+                        text: $transmitterID,
+                        length: 6,
+                        allowedCharacters: .alphanumericUppercased,
+                        focused: $fieldFocused
+                    )
+                    .frame(maxWidth: .infinity)
+                    .onChange(of: transmitterID) {
+                        validationMessage = nil
+                        autoSubmitIfComplete()
+                    }
 
-                    if let validationMessage = validationMessage {
-                        Text(validationMessage)
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                            .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 6) {
+                        if let validationMessage = validationMessage {
+                            Text(validationMessage)
+                                .foregroundColor(.red)
+                        }
+                        if let scanFailedMessage = scanFailedMessage {
+                            Text(verbatim: scanFailedMessage)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
+
+                    if isScanAvailable {
+                        Button(action: scanTapped) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "barcode.viewfinder")
+                                Text(LocalizedString("Scan package code", comment: "Scan package barcode button"))
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(Color.accentColor))
+                        }
+                        .frame(maxWidth: .infinity)
                     }
 
                     Text(LocalizedString("This app works with Dexcom G6 and Dexcom ONE transmitters. Older G5 transmitters, whose IDs begin with 4, are not supported.", comment: "Transmitter ID: supported hardware note"))
@@ -229,11 +425,120 @@ struct G6TransmitterIDEntryView: View {
                 }
                 .padding()
             }
+            .onTapGesture { fieldFocused = false }
 
             G6ContinueButton(isEnabled: transmitterID.count == 6) {
                 submit()
             }
         }
+        .sheet(isPresented: $showScanner) { scannerSheet }
+        .alert(
+            Text(LocalizedString("Camera access is off", comment: "Camera denied alert title")),
+            isPresented: $showCameraDeniedAlert
+        ) {
+            Button(action: {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }) { Text(LocalizedString("Open Settings", comment: "Open Settings button")) }
+            Button(role: .cancel, action: {}) { Text(LocalizedString("Cancel", comment: "Cancel button")) }
+        } message: {
+            Text(LocalizedString("Allow camera access in Settings to scan the Data Matrix code on your Dexcom transmitter packaging.", comment: "Camera denied alert message"))
+        }
+    }
+
+    /// A complete ID submits itself, typed or scanned: with the boxes full
+    /// there is nothing left to enter. A short delay lets the last box
+    /// visibly fill first.
+    private func autoSubmitIfComplete() {
+        guard transmitterID.count == 6, !isG5 else {
+            return
+        }
+        fieldFocused = false
+        let submitted = transmitterID
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            guard transmitterID == submitted else { return }
+            didSubmit(submitted)
+        }
+    }
+
+    // MARK: - Package scanning
+
+    /// The camera scanner needs hardware support and a camera usage
+    /// description; the simulator gets the demo-payload stand-in instead
+    /// (see `G6DemoScan`).
+    private var isScanAvailable: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return G6PackageScannerView.isSupported
+        #endif
+    }
+
+    private func scanTapped() {
+        #if targetEnvironment(simulator)
+        handleScan(G6DemoScan.transmitterBox)
+        #else
+        switch G6PackageScannerView.cameraAuthorization {
+        case .authorized:
+            showScanner = true
+        case .notDetermined:
+            G6PackageScannerView.requestCameraAccess { granted in
+                if granted {
+                    showScanner = true
+                } else {
+                    showCameraDeniedAlert = true
+                }
+            }
+        default:
+            showCameraDeniedAlert = true
+        }
+        #endif
+    }
+
+    private func handleScan(_ scan: G6PackageScan) {
+        showScanner = false
+        scanFailedMessage = nil
+
+        // A usable ID outweighs the GTIN check: the transmitter box's own
+        // Data Matrices carry no (01) — the GTIN sits on a separate linear
+        // barcode — so gating on isDexcomPackage would reject the box.
+        guard let candidate = scan.transmitterIDCandidate else {
+            scanFailedMessage = scan.isDexcomPackage
+                ? LocalizedString("Scanned a Dexcom package, but couldn't find a transmitter ID in it. Type the ID manually.", comment: "Scanned Dexcom barcode without a transmitter ID")
+                : LocalizedString("That doesn't look like a Dexcom package. Try again or type the ID manually.", comment: "Scanned non-Dexcom barcode")
+            return
+        }
+
+        // Assigning the field fires the auto-submit path, same as typing.
+        transmitterID = candidate
+    }
+
+    private func handleScanStartFailure(_: Error) {
+        showScanner = false
+        scanFailedMessage = LocalizedString("The camera couldn't start. Try again or type the ID manually.", comment: "Scanner failed to start")
+    }
+
+    private var scannerSheet: some View {
+        NavigationView {
+            G6PackageScannerView(onScan: handleScan, onStartFailure: handleScanStartFailure)
+                .edgesIgnoringSafeArea(.all)
+                .navigationTitle(Text(LocalizedString("Scan package code", comment: "Scanner screen title")))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { showScanner = false }) {
+                            Text(LocalizedString("Cancel", comment: "Cancel button"))
+                        }
+                    }
+                }
+        }
+    }
+
+    // MARK: - Submit
+
+    private var isG5: Bool {
+        return transmitterID.hasPrefix("4")
     }
 
     private func submit() {
@@ -241,7 +546,7 @@ struct G6TransmitterIDEntryView: View {
             return
         }
 
-        if transmitterID.hasPrefix("4") {
+        if isG5 {
             validationMessage = LocalizedString("IDs that begin with 4 belong to Dexcom G5 transmitters, which this app does not support.", comment: "Validation message for G5 transmitter ID")
             return
         }
@@ -250,7 +555,7 @@ struct G6TransmitterIDEntryView: View {
     }
 }
 
-// MARK: - 3. Sensor code
+// MARK: - 4. Sensor code
 
 struct G6SensorCodeEntryView: View {
     /// Passes nil when the user chooses to start without a code.
@@ -259,6 +564,9 @@ struct G6SensorCodeEntryView: View {
     @State private var sensorCode: String = ""
     @State private var validationMessage: String?
     @State private var confirmingNoCode = false
+    @State private var showScanner = false
+    @State private var showCameraDeniedAlert = false
+    @State private var scanFailedMessage: String?
     @FocusState private var codeFieldFocused: Bool
 
     var body: some View {
@@ -270,41 +578,66 @@ struct G6SensorCodeEntryView: View {
 
                     G6FindCodeCard(
                         assetName: "G6SensorCodeLocation",
-                        caption: LocalizedString("The 4-digit code is on the applicator’s adhesive label, and is unique to that sensor. Use the code from the applicator you are about to insert — a code from a different one will make readings inaccurate.", comment: "Sensor code: where to find it")
+                        caption: LocalizedString("The 4-digit code is on the applicator’s adhesive label, and is unique to that sensor. Use the code from the applicator you are about to insert — a code from a different one will make readings inaccurate.", comment: "Sensor code: where to find it"),
+                        imageHeight: 110
                     ) {
-                        G6SensorCodeLabelGlyph(size: 150)
+                        G6SensorCodeLabelGlyph(size: 110)
                     }
 
-                    TextField(LocalizedString("4-digit code", comment: "Sensor code text field placeholder"), text: $sensorCode)
-                        .keyboardType(.numberPad)
-                        .focused($codeFieldFocused)
-                        .font(.title3.monospaced())
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(10)
-                        .onChange(of: sensorCode) { newValue in
-                            sensorCode = String(newValue.filter(\.isNumber).prefix(4))
-                            validationMessage = nil
-                        }
+                    G6CodeBoxField(
+                        text: $sensorCode,
+                        length: 4,
+                        allowedCharacters: .numeric,
+                        focused: $codeFieldFocused
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 32)
+                    .onChange(of: sensorCode) {
+                        validationMessage = nil
+                        autoSubmitIfComplete()
+                    }
 
-                    if let validationMessage = validationMessage {
-                        Text(validationMessage)
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                            .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 6) {
+                        if let validationMessage = validationMessage {
+                            Text(validationMessage)
+                                .foregroundColor(.red)
+                        }
+                        if let scanFailedMessage = scanFailedMessage {
+                            Text(verbatim: scanFailedMessage)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
+
+                    if isScanAvailable {
+                        Button(action: scanTapped) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "barcode.viewfinder")
+                                Text(LocalizedString("Scan applicator code", comment: "Scan applicator barcode button"))
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(Color.accentColor))
+                        }
+                        .frame(maxWidth: .infinity)
                     }
 
                     G6CalloutBox(
                         symbolName: "drop.fill",
                         tint: .blue,
                         title: LocalizedString("No code on your sensor?", comment: "Sensor code callout title"),
-                        body: LocalizedString("You can start without one. The transmitter will then ask you for two fingerstick glucose values after warm-up, and for one more each day. \"Calibration\" means telling the sensor what your meter reads, so it can correct itself.", comment: "Sensor code callout body explaining calibration")
+                        body: LocalizedString("You can start without one. The transmitter will then ask you for two fingerstick glucose values after warm-up, and for one more each day.", comment: "Sensor code callout body explaining calibration")
                     )
 
                 }
                 .padding()
             }
-            .onAppear { codeFieldFocused = true }
+            .onTapGesture { codeFieldFocused = false }
 
             VStack(spacing: 10) {
                 G6ContinueButton(
@@ -334,7 +667,113 @@ struct G6SensorCodeEntryView: View {
                 }
             }
         }
+        .sheet(isPresented: $showScanner) { scannerSheet }
+        .alert(
+            Text(LocalizedString("Camera access is off", comment: "Camera denied alert title")),
+            isPresented: $showCameraDeniedAlert
+        ) {
+            Button(action: {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }) { Text(LocalizedString("Open Settings", comment: "Open Settings button")) }
+            Button(role: .cancel, action: {}) { Text(LocalizedString("Cancel", comment: "Cancel button")) }
+        } message: {
+            Text(LocalizedString("Allow camera access in Settings to scan the Data Matrix code on your sensor applicator.", comment: "Camera denied alert message (sensor code)"))
+        }
     }
+
+    /// A complete code submits itself when it is a known factory code,
+    /// typed or scanned. Unknown codes show the validation message instead
+    /// of advancing.
+    private func autoSubmitIfComplete() {
+        guard sensorCode.count == 4 else {
+            return
+        }
+        guard SensorCode(sensorCode) != nil else {
+            validationMessage = LocalizedString("That code isn't one this app recognizes. Check the digits on the applicator label, or start without a code.", comment: "Validation message for unrecognized sensor code")
+            return
+        }
+        codeFieldFocused = false
+        let submitted = sensorCode
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            guard sensorCode == submitted else { return }
+            didSubmit(submitted)
+        }
+    }
+
+    // MARK: - Package scanning
+
+    /// The camera scanner needs hardware support and a camera usage
+    /// description; the simulator gets the demo-payload stand-in instead
+    /// (see `G6DemoScan`).
+    private var isScanAvailable: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return G6PackageScannerView.isSupported
+        #endif
+    }
+
+    private func scanTapped() {
+        #if targetEnvironment(simulator)
+        handleScan(G6DemoScan.applicator)
+        #else
+        switch G6PackageScannerView.cameraAuthorization {
+        case .authorized:
+            showScanner = true
+        case .notDetermined:
+            G6PackageScannerView.requestCameraAccess { granted in
+                if granted {
+                    showScanner = true
+                } else {
+                    showCameraDeniedAlert = true
+                }
+            }
+        default:
+            showCameraDeniedAlert = true
+        }
+        #endif
+    }
+
+    private func handleScan(_ scan: G6PackageScan) {
+        showScanner = false
+        scanFailedMessage = nil
+
+        // Applicator labels carry no GTIN, so unlike the transmitter-ID
+        // screen there is no Dexcom-package gate: either a sensor code
+        // falls out of the payload or it does not.
+        guard let candidate = scan.sensorCodeCandidate else {
+            scanFailedMessage = LocalizedString("Couldn't find a sensor code in that barcode. The code is in the Data Matrix on the applicator, not the sensor box.", comment: "Scanned barcode without a sensor code")
+            return
+        }
+
+        // Assigning the field fires the auto-submit path, same as typing.
+        sensorCode = candidate
+    }
+
+    private func handleScanStartFailure(_: Error) {
+        showScanner = false
+        scanFailedMessage = LocalizedString("The camera couldn't start. Try again or type the code manually.", comment: "Scanner failed to start")
+    }
+
+    private var scannerSheet: some View {
+        NavigationView {
+            G6PackageScannerView(onScan: handleScan, onStartFailure: handleScanStartFailure)
+                .edgesIgnoringSafeArea(.all)
+                .navigationTitle(Text(LocalizedString("Scan applicator code", comment: "Scanner screen title (sensor code)")))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { showScanner = false }) {
+                            Text(LocalizedString("Cancel", comment: "Cancel button"))
+                        }
+                    }
+                }
+        }
+    }
+
+    // MARK: - Submit
 
     private func submit() {
         guard SensorCode(sensorCode) != nil else {
@@ -346,7 +785,7 @@ struct G6SensorCodeEntryView: View {
     }
 }
 
-// MARK: - 5. Pairing
+// MARK: - 6. Pairing
 
 /// Observes the manager so the screen reflects the radio live. Without this
 /// the view read `manager.state` once and never updated, so a successful
@@ -357,6 +796,7 @@ final class G6PairingViewModel: ObservableObject, G6CGMManagerObserver {
     @Published private(set) var phase: G6ConnectionPhase = .searching
     @Published private(set) var isPaired = false
     @Published private(set) var hasSession = false
+    @Published private(set) var isPassive = false
     @Published private(set) var searchingLongerThanExpected = false
 
     private let startedAt = Date()
@@ -394,11 +834,12 @@ final class G6PairingViewModel: ObservableObject, G6CGMManagerObserver {
         let phase = cgmManager.connectionPhase
         let paired = cgmManager.isPaired
         let session = cgmManager.state.sensorStartDate != nil
+        let passive = cgmManager.state.passiveModeEnabled
         if Thread.isMainThread {
-            self.phase = phase; isPaired = paired; hasSession = session
+            self.phase = phase; isPaired = paired; hasSession = session; isPassive = passive
         } else {
             DispatchQueue.main.async {
-                self.phase = phase; self.isPaired = paired; self.hasSession = session
+                self.phase = phase; self.isPaired = paired; self.hasSession = session; self.isPassive = passive
             }
         }
     }
@@ -456,7 +897,14 @@ struct G6PairingView: View {
                         Text(LocalizedString("Your transmitter only talks to your phone about once every 5 minutes, so this can take a few minutes. Keep your phone nearby.", comment: "Pairing: explanation of the 5-minute cycle"))
                     }
 
-                    if viewModel.phase == .awaitingPairing {
+                    if viewModel.isPassive, !viewModel.isPaired {
+                        G6CalloutBox(
+                            symbolName: "ear.badge.waveform",
+                            tint: .blue,
+                            title: LocalizedString("Listening to the Dexcom app", comment: "Pairing callout title in passive mode"),
+                            body: LocalizedString("Passive mode never pairs with the transmitter itself. The Dexcom G6 or ONE app must be installed and connected to this transmitter — this app listens to its session.", comment: "Pairing callout body in passive mode")
+                        )
+                    } else if viewModel.phase == .awaitingPairing {
                         G6CalloutBox(
                             symbolName: "lock.shield.fill",
                             tint: .orange,
@@ -485,7 +933,9 @@ struct G6PairingView: View {
                             symbolName: "exclamationmark.triangle.fill",
                             tint: .orange,
                             title: LocalizedString("Still looking", comment: "Pairing troubleshooting title"),
-                            body: LocalizedString("Check that the Dexcom app is not connected to this transmitter, that the transmitter ID is exactly right, and that your phone is next to it. Bluetooth must be on.", comment: "Pairing troubleshooting body")
+                            body: viewModel.isPassive
+                                ? LocalizedString("Check that the Dexcom app is installed and connected to this transmitter, that the transmitter ID is exactly right, and that your phone is next to it. Bluetooth must be on.", comment: "Pairing troubleshooting body in passive mode")
+                                : LocalizedString("Check that the Dexcom app is not connected to this transmitter, that the transmitter ID is exactly right, and that your phone is next to it. Bluetooth must be on.", comment: "Pairing troubleshooting body")
                         )
 
                         Button {
@@ -534,7 +984,7 @@ struct G6PairingView: View {
     }
 }
 
-// MARK: - 6. Warm-up
+// MARK: - 7. Warm-up
 
 struct G6WarmupView: View {
     let manager: G6CGMManager?

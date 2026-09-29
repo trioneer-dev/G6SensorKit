@@ -4,8 +4,8 @@
 //
 //  Copyright © 2026 Nightscout Foundation. MIT License.
 //
-//  Calibration entry, transmitter details, Anubis session-length settings,
-//  and optional Dexcom Share upload configuration.
+//  Calibration entry, transmitter and battery details, Anubis session-length
+//  settings, and optional Dexcom Share upload configuration.
 //
 
 import SwiftUI
@@ -17,19 +17,98 @@ import G6SensorCore
 
 // MARK: - Calibration
 
+/// Keeps the calibration screen's "current reading" live. State updates
+/// alone are not enough: they only arrive WITH a reading, so without the
+/// tick a disconnected transmitter would leave an old reading looking
+/// fresh forever.
+final class G6CalibrationViewModel: ObservableObject, G6CGMManagerObserver {
+    @Published private(set) var latestReading: G6StoredReading?
+    @Published private(set) var now = Date()
+
+    private var tick: Timer?
+
+    init(cgmManager: G6CGMManager) {
+        latestReading = cgmManager.state.latestReading
+        cgmManager.addStateObserver(self)
+
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
+            self?.now = Date()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        tick = timer
+    }
+
+    deinit {
+        tick?.invalidate()
+    }
+
+    func g6CGMManagerDidUpdateState(_ manager: G6CGMManager) {
+        DispatchQueue.main.async {
+            self.latestReading = manager.state.latestReading
+        }
+    }
+
+    /// Readings arrive every 5 minutes; one missed reading closes the gate.
+    /// The extra 30 seconds absorb delivery jitter so a slightly late reading
+    /// does not flicker the gate.
+    static let readingFreshnessInterval: TimeInterval = .minutes(5.5)
+
+    /// Why calibration is or is not currently possible.
+    enum Readiness {
+        case ready
+        case noFreshReading
+        case notFlat
+    }
+
+    var freshReading: G6StoredReading? {
+        guard let reading = latestReading,
+              now.timeIntervalSince(reading.date) <= Self.readingFreshnessInterval
+        else {
+            return nil
+        }
+        return reading
+    }
+
+    /// Calibrating teaches the sensor from the difference between the
+    /// fingerstick and the current reading; a reading that is moving cannot
+    /// be compared fairly, so calibration requires a flat trend.
+    var readiness: Readiness {
+        guard let reading = freshReading else {
+            return .noFreshReading
+        }
+        guard G6TrendArrow(dexcomRateMgDLPerMinute: reading.trendRateMgDLPerMinute) == .flat else {
+            return .notFlat
+        }
+        return .ready
+    }
+}
+
 struct G6CalibrationView: View {
 
     let cgmManager: G6CGMManager
     let didSubmit: () -> Void
 
+    @StateObject private var viewModel: G6CalibrationViewModel
+
     @State private var entry: String = ""
     @State private var validationMessage: String?
     @State private var showingGuide = false
+    @State private var showingDeviationWarning = false
 
     @EnvironmentObject private var displayGlucosePreference: DisplayGlucosePreference
 
     private static let minimumMgDL: Double = 40
     private static let maximumMgDL: Double = 400
+
+    /// Deviation from the current reading at or beyond which the big-change
+    /// warning shows (mg/dL).
+    private static let largeDeviationWarningMgDL: Double = 40
+
+    init(cgmManager: G6CGMManager, didSubmit: @escaping () -> Void) {
+        self.cgmManager = cgmManager
+        self.didSubmit = didSubmit
+        _viewModel = StateObject(wrappedValue: G6CalibrationViewModel(cgmManager: cgmManager))
+    }
 
     private var unit: HKUnit {
         return displayGlucosePreference.unit
@@ -45,6 +124,38 @@ struct G6CalibrationView: View {
 
     private func quantity(fromMgDL value: Double) -> HKQuantity {
         return HKQuantity(unit: .milligramsPerDeciliter, doubleValue: value)
+    }
+
+    private func formatted(mgdl value: Double) -> String {
+        return displayGlucosePreference.format(quantity(fromMgDL: value))
+    }
+
+    /// Latest sensor reading in mg/dL, if one exists and is fresh enough to
+    /// calibrate against.
+    private var currentValueMgDL: Double? {
+        return viewModel.freshReading?.glucoseMgDL
+    }
+
+    private var isCalibrationBlocked: Bool {
+        return viewModel.readiness != .ready
+    }
+
+    private var enteredMgDL: Double? {
+        let normalized = entry.replacingOccurrences(of: decimalSeparator, with: ".")
+        return Double(normalized).map {
+            HKQuantity(unit: unit, doubleValue: $0).doubleValue(for: .milligramsPerDeciliter)
+        }
+    }
+
+    private var deviationMgDL: Double? {
+        guard let entered = enteredMgDL, let current = currentValueMgDL else {
+            return nil
+        }
+        return abs(entered - current)
+    }
+
+    private var showsLargeDeviationWarning: Bool {
+        return (deviationMgDL ?? 0) >= Self.largeDeviationWarningMgDL
     }
 
     private func sanitize(_ input: String) -> String {
@@ -84,13 +195,26 @@ struct G6CalibrationView: View {
                         }
                     }
 
+                    HStack {
+                        Text(LocalizedString("Current sensor reading", comment: "Calibration: current reading label"))
+                        Spacer()
+                        if let current = currentValueMgDL {
+                            Text(formatted(mgdl: current))
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text(LocalizedString("—", comment: "Placeholder for missing value"))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .font(.subheadline)
+
                     TextField(unit.localizedShortUnitString, text: $entry)
                         .keyboardType(usesDecimals ? .decimalPad : .numberPad)
                         .font(.title3.monospaced())
                         .padding()
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(10)
-                        .onChange(of: entry) { newValue in
+                        .onChange(of: entry) { _, newValue in
                             let sanitized = sanitize(newValue)
                             if sanitized != newValue {
                                 entry = sanitized
@@ -112,33 +236,74 @@ struct G6CalibrationView: View {
                         body: LocalizedString("The calibration is sent the next time your transmitter connects, which can be up to 5 minutes away. The transmitter may accept it, ask for a second value, or reject it — this screen's status will tell you which.", comment: "Calibration callout body about delivery timing")
                     )
 
+                    switch viewModel.readiness {
+                    case .ready:
+                        EmptyView()
+                    case .noFreshReading:
+                        G6CalloutBox(
+                            symbolName: "exclamationmark.triangle.fill",
+                            tint: .orange,
+                            title: LocalizedString("No recent sensor reading", comment: "Calibration unavailable: title"),
+                            body: LocalizedString("Calibrating compares your fingerstick to what the sensor reads right now, so it needs a recent reading. Wait for the next reading, then calibrate.", comment: "Calibration unavailable: explanation")
+                        )
+                    case .notFlat:
+                        G6CalloutBox(
+                            symbolName: "exclamationmark.triangle.fill",
+                            tint: .orange,
+                            title: LocalizedString("Glucose is changing", comment: "Calibration unavailable while trend is not flat: title"),
+                            body: LocalizedString("Calibrating compares your fingerstick to the current reading, which only works when your glucose is steady. Wait for a flat trend arrow (→), then calibrate.", comment: "Calibration unavailable while trend is not flat: explanation")
+                        )
+                    }
+
                 }
                 .padding()
             }
 
-            Button(action: submit) {
+            Button(action: submitTapped) {
                 Text(LocalizedString("Send Calibration", comment: "Calibration submit button"))
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(G6PrimaryButtonStyle())
-            .disabled(entry.isEmpty)
+            .disabled(entry.isEmpty || isCalibrationBlocked)
             .padding()
         }
         .sheet(isPresented: $showingGuide) {
             G6CalibrationGuideView(onDone: { showingGuide = false })
         }
+        .alert(
+            Text(LocalizedString("Large calibration change", comment: "Calibration deviation warning title")),
+            isPresented: $showingDeviationWarning
+        ) {
+            Button(role: .cancel, action: {}) {
+                Text(LocalizedString("Cancel", comment: "Cancel button"))
+            }
+            Button(action: submit) {
+                Text(LocalizedString("Send Anyway", comment: "Confirm calibration despite large deviation"))
+            }
+        } message: {
+            Text(String(
+                format: LocalizedString("This is %1$@ away from the current sensor reading. A change this large can be bad for sensor accuracy; try to limit each calibration to at most %2$@ at a time.", comment: "Calibration deviation warning (1: deviation with unit, 2: recommended maximum with unit)"),
+                formatted(mgdl: deviationMgDL ?? 0),
+                formatted(mgdl: Self.largeDeviationWarningMgDL)
+            ))
+        }
+    }
+
+    private func submitTapped() {
+        // A large jump from the current reading gets a confirmation first;
+        // big corrections can teach the sensor the wrong thing.
+        guard showsLargeDeviationWarning else {
+            submit()
+            return
+        }
+        showingDeviationWarning = true
     }
 
     private func submit() {
-        let normalized = entry.replacingOccurrences(of: decimalSeparator, with: ".")
-
-        guard let entered = Double(normalized) else {
+        guard let valueMgDL = enteredMgDL else {
             validationMessage = LocalizedString("Enter a number.", comment: "Validation message for non-numeric calibration entry")
             return
         }
-
-        let valueMgDL = HKQuantity(unit: unit, doubleValue: entered)
-            .doubleValue(for: .milligramsPerDeciliter)
 
         guard (Self.minimumMgDL...Self.maximumMgDL).contains(valueMgDL) else {
             validationMessage = String(
@@ -162,6 +327,12 @@ struct G6TransmitterDetailsView: View {
     let onPairNewTransmitter: () -> Void
 
     @State private var showingPairConfirmation = false
+
+    /// Mirrors the persisted mode; writes go through the manager, which
+    /// rebuilds the session as the other kind.
+    @State private var passiveModeEnabled = false
+
+    @State private var showingDirectModeConfirmation = false
 
     var body: some View {
         List {
@@ -188,7 +359,45 @@ struct G6TransmitterDetailsView: View {
             }
 
             Section {
-                row(LocalizedString("Model", comment: "Transmitter detail label for model"), cgmManager.state.deviceModel)
+                // Turning passive off is confirmed before the switch: a direct
+                // session connects straight away, and two clients talking to
+                // the transmitter from one phone interfere with each other.
+                Toggle(LocalizedString("Passive Mode", comment: "Toggle label for passive (listen-only) mode"), isOn: Binding(
+                    get: { passiveModeEnabled },
+                    set: { newValue in
+                        if newValue {
+                            setPassiveModeEnabled(true)
+                        } else {
+                            showingDirectModeConfirmation = true
+                        }
+                    }
+                ))
+                .confirmationDialog(
+                    LocalizedString("Switch to direct mode?", comment: "Confirmation title for turning passive mode off"),
+                    isPresented: $showingDirectModeConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button(LocalizedString("Switch to Direct Mode", comment: "Confirm turning passive mode off")) {
+                        setPassiveModeEnabled(false)
+                    }
+                } message: {
+                    Text(LocalizedString("Close the Dexcom app and turn off its Bluetooth access, or delete it, before switching. Only one app on this phone can talk to the transmitter; if the Dexcom app is still connected, the two will interfere and readings can be lost.", comment: "Warning shown before turning passive mode off"))
+                }
+            } header: {
+                Text(LocalizedString("Connection", comment: "Transmitter details section header for connection mode"))
+            } footer: {
+                if passiveModeEnabled {
+                    Text(LocalizedString("Passive mode listens to the Dexcom G6 or ONE app on this phone, which must be installed and running a sensor session with this transmitter. Start, stop and calibrate from the Dexcom app.", comment: "Footer explaining passive mode"))
+                } else {
+                    Text(LocalizedString("Direct mode talks to the transmitter itself, which allows starting, stopping and calibrating sessions here. The Dexcom app must not be connected to this transmitter while direct mode is on.", comment: "Footer explaining direct mode"))
+                }
+            }
+
+            Section {
+                row(
+                    LocalizedString("Model", comment: "Transmitter detail label for model"),
+                    cgmManager.state.isAnubis ? "Anubis" : cgmManager.state.deviceModel
+                )
                 row(LocalizedString("Transmitter ID", comment: "Transmitter detail label for ID"), cgmManager.state.transmitterID)
                 row(
                     LocalizedString("Firmware", comment: "Transmitter detail label for firmware"),
@@ -225,56 +434,78 @@ struct G6TransmitterDetailsView: View {
                 }
             }
 
-            batterySection
         }
         .listStyle(.insetGrouped)
+        .onAppear { passiveModeEnabled = cgmManager.state.passiveModeEnabled }
     }
 
-    @ViewBuilder
-    private var batterySection: some View {
-        if let voltageA = cgmManager.state.batteryVoltageAMillivolts,
-           let voltageB = cgmManager.state.batteryVoltageBMillivolts {
-            Section {
-                row(
-                    LocalizedString("Voltage A", comment: "Transmitter detail label for battery A"),
-                    String(format: LocalizedString("%d mV", comment: "Voltage in millivolts (1: millivolts)"), voltageA)
-                )
-                HStack {
-                    Text(LocalizedString("Voltage B", comment: "Transmitter detail label for battery B"))
-                    Spacer()
-                    Text(String(format: LocalizedString("%d mV", comment: "Voltage in millivolts (1: millivolts)"), voltageB))
-                        .foregroundColor(cgmManager.state.isBatteryLow ? .orange : .secondary)
-                }
-                if let resistance = cgmManager.state.batteryResistance {
+    private func setPassiveModeEnabled(_ enabled: Bool) {
+        passiveModeEnabled = enabled
+        cgmManager.setPassiveModeEnabled(enabled)
+    }
+
+    private func row(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value).foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - Battery details
+
+struct G6BatteryDetailsView: View {
+
+    let cgmManager: G6CGMManager
+
+    var body: some View {
+        List {
+            if let voltageA = cgmManager.state.batteryVoltageAMillivolts,
+               let voltageB = cgmManager.state.batteryVoltageBMillivolts {
+                Section {
                     row(
-                        LocalizedString("Resistance", comment: "Transmitter detail label for battery resistance"),
-                        String(Int(resistance))
+                        LocalizedString("Voltage A", comment: "Transmitter detail label for battery A"),
+                        String(format: LocalizedString("%d mV", comment: "Voltage in millivolts (1: millivolts)"), voltageA)
                     )
-                }
-                if let temperature = cgmManager.state.batteryTemperature {
-                    row(
-                        LocalizedString("Temperature", comment: "Transmitter detail label for temperature"),
-                        String(format: LocalizedString("%d °C", comment: "Temperature in Celsius (1: degrees)"), temperature)
-                    )
-                }
-                if let read = cgmManager.state.lastBatteryReadDate {
-                    row(
-                        LocalizedString("Last checked", comment: "Transmitter detail label for last battery read"),
-                        read.formatted(date: .abbreviated, time: .shortened)
-                    )
-                }
-            } header: {
-                Text(LocalizedString("Battery", comment: "Transmitter details section header for battery"))
-            } footer: {
-                if cgmManager.state.isBatteryVeryLow {
-                    Text(LocalizedString("Voltage B is very low. This transmitter may stop sending readings at any time, even during a session. Replace it as soon as you can.", comment: "Footer shown when battery B is very low"))
-                } else if cgmManager.state.isBatteryLow {
-                    Text(LocalizedString("Voltage B is getting low. The transmitter should finish the sensor you are wearing, but order a replacement now.", comment: "Footer shown when battery B is low"))
-                } else {
-                    Text(LocalizedString("Battery B is the cell that runs down first and determines whether the transmitter can finish a session.", comment: "Footer explaining what battery B means"))
+                    HStack {
+                        Text(LocalizedString("Voltage B", comment: "Transmitter detail label for battery B"))
+                        Spacer()
+                        Text(String(format: LocalizedString("%d mV", comment: "Voltage in millivolts (1: millivolts)"), voltageB))
+                            .foregroundColor(cgmManager.state.isBatteryLow ? .orange : .secondary)
+                    }
+                    if let resistance = cgmManager.state.batteryResistance {
+                        row(
+                            LocalizedString("Resistance", comment: "Transmitter detail label for battery resistance"),
+                            String(Int(resistance))
+                        )
+                    }
+                    if let temperature = cgmManager.state.batteryTemperature {
+                        row(
+                            LocalizedString("Temperature", comment: "Transmitter detail label for temperature"),
+                            String(format: LocalizedString("%d °C", comment: "Temperature in Celsius (1: degrees)"), temperature)
+                        )
+                    }
+                    if let read = cgmManager.state.lastBatteryReadDate {
+                        row(
+                            LocalizedString("Last checked", comment: "Transmitter detail label for last battery read"),
+                            read.formatted(date: .abbreviated, time: .shortened)
+                        )
+                    }
+                } header: {
+                    Text(LocalizedString("Battery", comment: "Transmitter details section header for battery"))
+                } footer: {
+                    if cgmManager.state.isBatteryVeryLow {
+                        Text(LocalizedString("Voltage B is very low. This transmitter may stop sending readings at any time, even during a session. Replace it as soon as you can.", comment: "Footer shown when battery B is very low"))
+                    } else if cgmManager.state.isBatteryLow {
+                        Text(LocalizedString("Voltage B is getting low. The transmitter should finish the sensor you are wearing, but order a replacement now.", comment: "Footer shown when battery B is low"))
+                    } else {
+                        Text(LocalizedString("Battery B is the cell that runs down first and determines whether the transmitter can finish a session.", comment: "Footer explaining what battery B means"))
+                    }
                 }
             }
         }
+        .listStyle(.insetGrouped)
     }
 
     private func row(_ label: String, _ value: String) -> some View {
@@ -292,41 +523,65 @@ struct G6SensorLifeSettingsView: View {
 
     let cgmManager: G6CGMManager
 
-    @State private var days: Double
+    @State private var days: Int
+    @State private var savedDays: Int
 
     init(cgmManager: G6CGMManager) {
         self.cgmManager = cgmManager
-        _days = State(initialValue: Double(cgmManager.state.sensorLifeDays))
+        let initial = cgmManager.state.sensorLifeDays
+        _days = State(initialValue: initial)
+        _savedDays = State(initialValue: initial)
     }
 
-    private var range: ClosedRange<Double> {
-        let bounds = TransmitterManagerState.sensorLifeDaysRange
-        return Double(bounds.lowerBound)...Double(bounds.upperBound)
+    private var isDirty: Bool {
+        return days != savedDays
     }
 
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(LocalizedString("Session length", comment: "Session length picker label"))
+                    Spacer()
                     Text(String(
-                        format: LocalizedString("Session length: %d days", comment: "Session length value (1: day count)"),
-                        Int(days)
+                        format: LocalizedString("%d days", comment: "Session length value (1: day count)"),
+                        savedDays
                     ))
-                    .font(.headline)
-
-                    Slider(value: $days, in: range, step: 1) { editing in
-                        if !editing {
-                            cgmManager.setSensorLifeDays(Int(days))
-                        }
-                    }
+                    .foregroundColor(.secondary)
                 }
-            } header: {
-                Text(LocalizedString("Session Length", comment: "Section header for session length"))
+
+                Picker(selection: $days) {
+                    ForEach(TransmitterManagerState.sensorLifeDaysRange, id: \.self) { value in
+                        Text(String(
+                            format: LocalizedString("%d days", comment: "Session length option (1: day count)"),
+                            value
+                        ))
+                        .tag(value)
+                    }
+                } label: {
+                    Text(LocalizedString("Session length", comment: "Session length picker label"))
+                }
+                .pickerStyle(.wheel)
+                .labelsHidden()
             } footer: {
                 Text(LocalizedString("Modified transmitters can keep a sensor running past the standard 10 days. This setting only changes when this app treats the session as finished; it does not change the sensor's accuracy. Sensor readings can drift the longer a sensor is worn, so check against a fingerstick meter if a reading does not match how you feel.", comment: "Footer explaining extended session length and its accuracy caveat"))
             }
+
+            // Applied explicitly: a wheel picker fires intermediate values
+            // while scrolling, and each write hits persistent state.
+            Button(action: save) {
+                Text(LocalizedString("Save", comment: "Save session length button"))
+            }
+            .disabled(!isDirty)
+            .buttonStyle(G6PrimaryButtonStyle())
+            .listRowInsets(EdgeInsets())
         }
         .listStyle(.insetGrouped)
+    }
+
+    private func save() {
+        cgmManager.setSensorLifeDays(days)
+        savedDays = days
     }
 }
 

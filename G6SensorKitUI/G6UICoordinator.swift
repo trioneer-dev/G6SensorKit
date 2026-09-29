@@ -21,6 +21,7 @@ enum G6UIScreen {
     // Onboarding
     case introduction
     case transmitterIDEntry
+    case connectionMode
     case sensorCodeEntry
     case placementGuide
     case pairing
@@ -30,6 +31,7 @@ enum G6UIScreen {
     case settings
     case calibration
     case transmitterDetails
+    case batteryDetails
     case sensorLifeSettings
     case shareUpload
     case readingDetail
@@ -38,6 +40,7 @@ enum G6UIScreen {
     var setupStep: G6SetupStep? {
         switch self {
         case .transmitterIDEntry: return .transmitterID
+        case .connectionMode: return .connectionMode
         case .placementGuide: return .placement
         case .sensorCodeEntry: return .sensorCode
         case .pairing: return .pairing
@@ -49,6 +52,7 @@ enum G6UIScreen {
     init?(setupStep: G6SetupStep) {
         switch setupStep {
         case .transmitterID: self = .transmitterIDEntry
+        case .connectionMode: self = .connectionMode
         case .placement: self = .placementGuide
         case .sensorCode: self = .sensorCodeEntry
         case .pairing: self = .pairing
@@ -59,7 +63,8 @@ enum G6UIScreen {
     var next: G6UIScreen? {
         switch self {
         case .introduction: return .transmitterIDEntry
-        case .transmitterIDEntry: return .placementGuide
+        case .transmitterIDEntry: return .connectionMode
+        case .connectionMode: return .placementGuide
         case .placementGuide: return .sensorCodeEntry
         case .sensorCodeEntry: return .pairing
         case .pairing: return .warmup
@@ -96,6 +101,10 @@ public class G6UICoordinator: UINavigationController, CGMManagerOnboarding, Comp
 
     /// Transmitter ID collected during onboarding, before a manager exists.
     private var pendingTransmitterID: String?
+
+    /// Whether the user has answered the connection-mode screen in this flow.
+    /// Until then the manager's passive flag is a placeholder, not a choice.
+    private var hasChosenConnectionMode = false
 
     private var screenStack: [G6UIScreen] = []
 
@@ -208,17 +217,24 @@ public class G6UICoordinator: UINavigationController, CGMManagerOnboarding, Comp
     }
 
     private func nextScreen(after screen: G6UIScreen) -> G6UIScreen? {
+        // Sensor codes are entered in the Dexcom app in passive mode, so the
+        // code screen has no meaning there.
+        let isPassive = cgmManager?.state.passiveModeEnabled ?? false
+
         switch flowMode {
         case .onboarding:
             if screen == .pairing, !shouldShowWarmup {
                 return nil
+            }
+            if screen == .placementGuide, isPassive {
+                return .pairing
             }
             return screen.next
         case .replacingTransmitter:
             // No introduction, and no placement guide: the sensor is already
             // worn, only the transmitter changed.
             switch screen {
-            case .transmitterIDEntry: return .sensorCodeEntry
+            case .transmitterIDEntry: return isPassive ? .pairing : .sensorCodeEntry
             case .sensorCodeEntry: return .pairing
             case .pairing: return shouldShowWarmup ? .warmup : nil
             default: return nil
@@ -328,7 +344,11 @@ public class G6UICoordinator: UINavigationController, CGMManagerOnboarding, Comp
             return
         }
 
-        let state = G6CGMManagerState(transmitterID: transmitterID)
+        // Start passive until the user picks a mode on the next screen. A
+        // direct session would connect straight away and, if the Dexcom app
+        // already holds this transmitter, authenticate and try to pair with
+        // it before the user has said they want to listen instead.
+        let state = G6CGMManagerState(transmitterID: transmitterID, passiveModeEnabled: true)
         let manager = G6CGMManager(state: state)
         cgmManager = manager
         manager.recordSetupStep(.transmitterID)
@@ -361,6 +381,25 @@ public class G6UICoordinator: UINavigationController, CGMManagerOnboarding, Comp
                     }
                 ),
                 title: LocalizedString("Transmitter ID", comment: "Navigation title for transmitter ID entry")
+            )
+
+        case .connectionMode:
+            return hostingController(
+                rootView: G6ConnectionModeView(
+                    // The manager sits in passive mode until a choice is
+                    // made, so only show its mode once it reflects one.
+                    initialPassive: hasChosenConnectionMode ? (cgmManager?.state.passiveModeEnabled ?? false) : false,
+                    didContinue: { [weak self] passive in
+                        guard let self = self else { return }
+                        self.hasChosenConnectionMode = true
+                        if let manager = self.cgmManager {
+                            manager.logSetupEvent(passive ? "Chose passive mode" : "Chose direct mode")
+                            manager.setPassiveModeEnabled(passive)
+                        }
+                        self.stepFinished()
+                    }
+                ),
+                title: LocalizedString("Connection Mode", comment: "Navigation title for connection mode screen")
             )
 
         case .sensorCodeEntry:
@@ -408,6 +447,7 @@ public class G6UICoordinator: UINavigationController, CGMManagerOnboarding, Comp
                         cgmManager: cgmManager,
                         toCalibration: { [weak self] in self?.navigateTo(.calibration) },
                         toTransmitterDetails: { [weak self] in self?.navigateTo(.transmitterDetails) },
+                        toBatteryDetails: { [weak self] in self?.navigateTo(.batteryDetails) },
                         toSensorLifeSettings: { [weak self] in self?.navigateTo(.sensorLifeSettings) },
                         toShareUpload: { [weak self] in self?.navigateTo(.shareUpload) },
                         toReadingDetail: { [weak self] in self?.navigateTo(.readingDetail) },
@@ -456,6 +496,15 @@ public class G6UICoordinator: UINavigationController, CGMManagerOnboarding, Comp
                     onPairNewTransmitter: { [weak self] in self?.beginTransmitterReplacement() }
                 ),
                 title: LocalizedString("Transmitter", comment: "Navigation title for transmitter details")
+            )
+
+        case .batteryDetails:
+            guard let cgmManager = cgmManager else {
+                return UIViewController()
+            }
+            return hostingController(
+                rootView: G6BatteryDetailsView(cgmManager: cgmManager),
+                title: LocalizedString("Battery", comment: "Navigation title for battery details")
             )
 
         case .sensorLifeSettings:

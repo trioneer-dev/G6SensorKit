@@ -69,9 +69,7 @@ public final class G6CGMManager: CGMManager {
     public private(set) var session: TransmitterSession?
 
     /// Commands queued for the next connection cycle.
-    private let lockedPendingCommands: Locked<[Command]> = Locked([])
-
-    private var lastBatteryReadDate: Date?
+    private let lockedCommandQueue: Locked<CommandQueue> = Locked(CommandQueue())
 
     /// Response code from a session start awaiting confirmation. The reply
     /// alone does not say whether a session began, so it is held until the
@@ -134,7 +132,7 @@ public final class G6CGMManager: CGMManager {
 
     public init(state: G6CGMManagerState) {
         self.lockedState = Locked(state)
-        lockedPendingCommands.mutate { $0 = state.pendingCommands.compactMap(Command.init(rawValue:)) }
+        lockedCommandQueue.mutate { $0 = CommandQueue(rawValues: state.pendingCommands) }
         startSession()
     }
 
@@ -151,7 +149,7 @@ public final class G6CGMManager: CGMManager {
         }
 
         self.lockedState = Locked(state)
-        lockedPendingCommands.mutate { $0 = state.pendingCommands.compactMap(Command.init(rawValue:)) }
+        lockedCommandQueue.mutate { $0 = CommandQueue(rawValues: state.pendingCommands) }
         startSession()
     }
 
@@ -304,11 +302,8 @@ public final class G6CGMManager: CGMManager {
         // is persisted, a stale code-less start could reach the transmitter
         // ahead of the one carrying the sensor code the user actually typed.
         var superseded = 0
-        lockedPendingCommands.mutate { commands in
-            let before = commands.count
-            commands.removeAll { $0.supersededBy(command) }
-            superseded = before - commands.count
-            commands.append(command)
+        lockedCommandQueue.mutate { queue in
+            superseded = queue.enqueue(command)
         }
 
         if superseded > 0 {
@@ -316,10 +311,7 @@ public final class G6CGMManager: CGMManager {
         }
 
         mutateState { state in
-            state.pendingCommands.removeAll { raw in
-                Command(rawValue: raw).map { $0.supersededBy(command) } ?? true
-            }
-            state.pendingCommands.append(command.rawValue)
+            state.pendingCommands = self.lockedCommandQueue.value.rawValues
 
             // Reflect the entered code straight away. Waiting until the
             // transmitter answered meant the screen said "Not used" for as
@@ -332,6 +324,38 @@ public final class G6CGMManager: CGMManager {
 
         // Nudge the connection in case it is idle.
         session?.start()
+
+        #if targetEnvironment(simulator)
+        // No link will ever drain the queue in the simulator; apply the
+        // command to state directly, mirroring didComplete on hardware,
+        // so End Sensor / Start New Sensor work end-to-end there.
+        lockedCommandQueue.mutate { _ = $0.dequeue() }
+        if case .stopSensor = command, state.sensorStartDate != nil {
+            let sensorEnded = PersistedCgmEvent(
+                date: Date(),
+                type: .sensorEnd,
+                deviceIdentifier: state.transmitterID,
+                failureMessage: LocalizedString("Stopped by user", comment: "Reason recorded when a session ends because the user stopped it")
+            )
+            delegate.notify { delegate in
+                delegate?.cgmManager(self, hasNew: [sensorEnded])
+            }
+        }
+        mutateState { state in
+            state.pendingCommands = self.lockedCommandQueue.value.rawValues
+            switch command {
+            case .stopSensor:
+                state.sensorStartDate = nil
+                state.sensorCode = nil
+            case .startSensor(let date, let sensorCode):
+                state.sensorCode = sensorCode.carriesParameters ? sensorCode.code : nil
+                state.sensorStartDate = date
+                    .addingTimeInterval(-(state.warmupPeriod - G6CGMManager.simulatedWarmupRemaining))
+            case .calibrateSensor, .resetTransmitter:
+                break
+            }
+        }
+        #endif
     }
 
     public func setSensorLifeDays(_ days: Int) {
@@ -383,7 +407,7 @@ public final class G6CGMManager: CGMManager {
             if connectionPhase == .connected {
                 log.default("Old transmitter still connected; sending session stop before switching")
                 session?.commandSource = self
-                lockedPendingCommands.mutate { $0 = [.stopSensor(at: Date())] }
+                lockedCommandQueue.mutate { $0 = CommandQueue([.stopSensor(at: Date())]) }
             } else {
                 log.default("Old transmitter not connected; its session is left as-is")
             }
@@ -407,7 +431,7 @@ public final class G6CGMManager: CGMManager {
         // middle of the state reset. The session itself is kept and pointed at
         // the new transmitter — the radio does not need rebuilding for a swap.
         session?.stop()
-        lockedPendingCommands.mutate { $0.removeAll() }
+        lockedCommandQueue.mutate { $0.removeAll() }
         raisedAlerts = []
 
         mutateState { state in
@@ -530,9 +554,9 @@ public final class G6CGMManager: CGMManager {
             }
         }
 
-        if let last = lastBatteryReadDate, Date().timeIntervalSince(last) < Self.batteryReadInterval {
-            // Battery was read recently.
-        } else {
+        let batteryReadRecently = state.lastBatteryReadDate
+            .map { Date().timeIntervalSince($0) < Self.batteryReadInterval } ?? false
+        if !batteryReadRecently {
             session?.shouldReadBattery = true
         }
 
@@ -632,7 +656,6 @@ extension G6CGMManager: TransmitterSessionDelegate {
     }
 
     public func transmitterSession(_ session: TransmitterSession, didReadBattery message: BatteryStatusRxMessage) {
-        lastBatteryReadDate = Date()
         log.default("Battery: A %d, B %d, resist %d", Int(message.voltageA), Int(message.voltageB), Int(message.resist))
 
         mutateState { state in
@@ -814,27 +837,10 @@ extension G6CGMManager: TransmitterSessionDelegate {
     }
 
     private func glucoseTrend(for glucose: Glucose) -> GlucoseTrend? {
-        guard let rate = glucose.trendRateMgDLPerMinute else {
+        guard let arrow = G6TrendArrow(dexcomRateMgDLPerMinute: glucose.trendRateMgDLPerMinute) else {
             return nil
         }
-
-        // Standard Dexcom trend arrow thresholds in (mg/dL)/min.
-        switch rate {
-        case ..<(-3):
-            return .downDownDown
-        case ..<(-2):
-            return .downDown
-        case ..<(-1):
-            return .down
-        case ..<1:
-            return .flat
-        case ..<2:
-            return .up
-        case ..<3:
-            return .upUp
-        default:
-            return .upUpUp
-        }
+        return GlucoseTrend(rawValue: arrow.rawValue)
     }
 }
 
@@ -846,36 +852,17 @@ extension G6CGMManager: TransmitterCommandSource {
     public func dequeuePendingCommand(for session: TransmitterSession) -> Command? {
         var next: Command?
         var dropped: [Command] = []
-        lockedPendingCommands.mutate { commands in
-            // A calibration is only meaningful next to the fingerstick it came
-            // from; xDrip uses the same five-minute window. Sending a stale one
-            // would teach the sensor from a value that no longer holds.
-            while let candidate = commands.first {
-                commands.removeFirst()
-                if case .calibrateSensor(_, let date) = candidate,
-                   Date().timeIntervalSince(date) > .minutes(5) {
-                    dropped.append(candidate)
-                    continue
-                }
-                next = candidate
-                break
-            }
+        lockedCommandQueue.mutate { queue in
+            (next, dropped) = queue.dequeue()
         }
 
         for command in dropped {
             log.default("Dropping stale command: %{public}@", String(describing: command))
-            mutateState { state in
-                if !state.pendingCommands.isEmpty {
-                    state.pendingCommands.removeFirst()
-                }
-            }
         }
 
-        if next != nil {
+        if next != nil || !dropped.isEmpty {
             mutateState { state in
-                if !state.pendingCommands.isEmpty {
-                    state.pendingCommands.removeFirst()
-                }
+                state.pendingCommands = self.lockedCommandQueue.value.rawValues
             }
         }
 
@@ -911,6 +898,17 @@ extension G6CGMManager: TransmitterCommandSource {
                 state.lastSessionStartFailure = nil
             }
         case .stopSensor:
+            if state.sensorStartDate != nil {
+                let sensorEnded = PersistedCgmEvent(
+                    date: Date(),
+                    type: .sensorEnd,
+                    deviceIdentifier: state.transmitterID,
+                    failureMessage: LocalizedString("Stopped by user", comment: "Reason recorded when a session ends because the user stopped it")
+                )
+                delegate.notify { delegate in
+                    delegate?.cgmManager(self, hasNew: [sensorEnded])
+                }
+            }
             mutateState { state in
                 state.sensorStartDate = nil
                 state.sensorCode = nil
@@ -933,18 +931,10 @@ struct G6GlucoseDisplay: GlucoseDisplayable {
     }
 
     var trendType: GlucoseTrend? {
-        guard let rate = reading.trendRateMgDLPerMinute else {
+        guard let arrow = G6TrendArrow(dexcomRateMgDLPerMinute: reading.trendRateMgDLPerMinute) else {
             return nil
         }
-        switch rate {
-        case ..<(-3): return .downDownDown
-        case ..<(-2): return .downDown
-        case ..<(-1): return .down
-        case ..<1: return .flat
-        case ..<2: return .up
-        case ..<3: return .upUp
-        default: return .upUpUp
-        }
+        return GlucoseTrend(rawValue: arrow.rawValue)
     }
 
     var trendRate: HKQuantity? {

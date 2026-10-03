@@ -1022,6 +1022,26 @@
     "This app listens to the session the Dexcom G6 or ONE app drives on this phone. The Dexcom app is required, and sessions, sensor codes and calibrations are managed there.": {
       "extractionState": "manual",
       "comment": "Passive mode explanation"
+    },
+    "Session stop queued — it is sent the next time the transmitter connects, which can take up to 5 minutes. Readings continue until then.": {
+      "comment": "Shown while a session stop is waiting for the next connection",
+      "extractionState": "manual"
+    },
+    "Stopping Sensor Session…": {
+      "comment": "Disabled row shown while a session stop waits for the transmitter",
+      "extractionState": "manual"
+    },
+    "The stop could not be sent to the transmitter, so the session is still running. Stop it again with your phone close to the transmitter.": {
+      "comment": "Shown when a session stop failed to send",
+      "extractionState": "manual"
+    },
+    "The stop is still waiting for the transmitter, so the session is still running. It is sent as soon as the transmitter connects. Keep your phone close to the transmitter; if its battery is low, it may not connect.": {
+      "comment": "Shown while a session stop has waited several connection cycles",
+      "extractionState": "manual"
+    },
+    "Your last calibration could not be sent to the transmitter and was not applied. To calibrate, take a new fingerstick and enter it.": {
+      "comment": "Shown when a calibration failed to send or expired unsent",
+      "extractionState": "manual"
     }
   },
   "version": "1.1"

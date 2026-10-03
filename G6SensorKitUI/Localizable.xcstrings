@@ -1042,6 +1042,18 @@
     "Your last calibration could not be sent to the transmitter and was not applied. To calibrate, take a new fingerstick and enter it.": {
       "comment": "Shown when a calibration failed to send or expired unsent",
       "extractionState": "manual"
+    },
+    "Readings may be missing or arrive late, and the transmitter may respond slowly or not at all — including to stopping a session or calibrating. Replace the transmitter as soon as you can, and check your glucose with a fingerstick meter if readings stop.": {
+      "comment": "Settings banner body when the transmitter battery is very low",
+      "extractionState": "manual"
+    },
+    "Transmitter Low": {
+      "comment": "Status highlight when the transmitter battery is very low",
+      "extractionState": "manual"
+    },
+    "Transmitter battery very low": {
+      "comment": "Settings banner title when the transmitter battery is very low",
+      "extractionState": "manual"
     }
   },
   "version": "1.1"

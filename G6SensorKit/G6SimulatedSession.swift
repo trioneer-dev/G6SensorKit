@@ -39,11 +39,21 @@ extension G6CGMManager {
 
             let now = Date()
             self.mutateStateForSimulation { state in
+                // A relaunch resumes a session that was already running
+                // rather than restarting warm-up, so a seeded state survives
+                // long enough to be looked at.
+
                 // Transmitter part-way through its life, sensor almost done
                 // warming up.
-                state.transmitterStartDate = now.addingTimeInterval(-.hours(24 * 12))
-                state.sensorStartDate = now.addingTimeInterval(-(state.warmupPeriod - Self.simulatedWarmupRemaining))
-                state.transmitterExpiryInDays = 90
+                if state.transmitterStartDate == nil {
+                    state.transmitterStartDate = now.addingTimeInterval(-.hours(24 * 12))
+                }
+                if state.sensorStartDate == nil {
+                    state.sensorStartDate = now.addingTimeInterval(-(state.warmupPeriod - Self.simulatedWarmupRemaining))
+                }
+                // 180 days so the simulator presents as an Anubis, making the
+                // longer session length and expiry visible in the UI.
+                state.transmitterExpiryInDays = 180
                 state.firmwareVersion = "1.0.0.0 (simulated)"
                 state.peripheralIdentifier = UUID()
             }
@@ -64,6 +74,9 @@ extension G6CGMManager {
     }
 
     private func emitSimulatedReading() {
+        // No active session (ended, or not yet started): stay quiet.
+        guard state.sensorStartDate != nil else { return }
+
         guard !state.isInWarmup else {
             // Still warming up: the state change alone refreshes the UI.
             notifySimulationObservers()

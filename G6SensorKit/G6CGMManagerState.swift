@@ -63,6 +63,9 @@ public struct G6CGMManagerState: RawRepresentable {
     /// migration from CGMBLEKit, which ran passive-only.
     public var passiveModeEnabled: Bool
 
+    /// The slot chosen for direct mode. See `effectiveTransmitterSlot`.
+    public var transmitterSlot: TransmitterSlot
+
     /// Transmitter-reported lifetime in days (90 stock, 180 Anubis); nil until
     /// the first version-rx frame arrives.
     public var transmitterExpiryInDays: UInt16?
@@ -168,6 +171,7 @@ public struct G6CGMManagerState: RawRepresentable {
         sensorCode: String? = nil,
         shouldSyncToRemoteService: Bool = true,
         passiveModeEnabled: Bool = false,
+        transmitterSlot: TransmitterSlot = .default,
         transmitterExpiryInDays: UInt16? = nil,
         sensorLifeDays: Int = TransmitterManagerState.defaultSensorLifeDays,
         latestReading: G6StoredReading? = nil,
@@ -188,6 +192,7 @@ public struct G6CGMManagerState: RawRepresentable {
         self.sensorCode = sensorCode
         self.shouldSyncToRemoteService = shouldSyncToRemoteService
         self.passiveModeEnabled = passiveModeEnabled
+        self.transmitterSlot = transmitterSlot
         self.transmitterExpiryInDays = transmitterExpiryInDays
         self.sensorLifeDays = TransmitterManagerState.clampedSensorLifeDays(sensorLifeDays)
         self.latestReading = latestReading
@@ -239,6 +244,7 @@ public struct G6CGMManagerState: RawRepresentable {
             sensorCode: rawValue["sensorCode"] as? String,
             shouldSyncToRemoteService: rawValue["shouldSyncToRemoteService"] as? Bool ?? true,
             passiveModeEnabled: rawValue["passiveModeEnabled"] as? Bool ?? isLegacyCGMBLEKitState,
+            transmitterSlot: (rawValue["transmitterSlot"] as? Int).flatMap { UInt8(exactly: $0) }.flatMap(TransmitterSlot.init(rawValue:)) ?? .default,
             transmitterExpiryInDays: expiry,
             sensorLifeDays: rawValue["sensorLifeDays"] as? Int ?? TransmitterManagerState.defaultSensorLifeDays,
             latestReading: (rawValue["latestReading"] as? G6StoredReading.RawValue).flatMap(G6StoredReading.init(rawValue:)),
@@ -290,6 +296,9 @@ public struct G6CGMManagerState: RawRepresentable {
         if isOnboarded {
             raw["isOnboarded"] = true
         }
+        if transmitterSlot != .default {
+            raw["transmitterSlot"] = Int(transmitterSlot.rawValue)
+        }
         raw["setupStep"] = setupStep?.rawValue
         if !pendingCommands.isEmpty {
             raw["pendingCommands"] = pendingCommands
@@ -313,6 +322,12 @@ public struct G6CGMManagerState: RawRepresentable {
     /// `true` once the transmitter reports the Anubis 180-day lifetime.
     public var isAnubis: Bool {
         return transmitterExpiryInDays == 180
+    }
+
+    /// The slot direct mode authenticates on: the chosen one if this
+    /// transmitter accepts it, otherwise the default.
+    public var effectiveTransmitterSlot: TransmitterSlot {
+        return transmitterSlot.resolved(isAnubis: isAnubis)
     }
 
     public var warmupPeriod: TimeInterval {
@@ -513,6 +528,7 @@ extension G6CGMManagerState: Equatable {
             && lhs.sensorCode == rhs.sensorCode
             && lhs.shouldSyncToRemoteService == rhs.shouldSyncToRemoteService
             && lhs.passiveModeEnabled == rhs.passiveModeEnabled
+            && lhs.transmitterSlot == rhs.transmitterSlot
             && lhs.transmitterExpiryInDays == rhs.transmitterExpiryInDays
             && lhs.sensorLifeDays == rhs.sensorLifeDays
             && lhs.latestReading == rhs.latestReading

@@ -15,11 +15,12 @@ import Foundation
 struct AuthRequestTxMessage: TransmitterTxMessage {
 
     let singleUseToken: Data
-    let endByte: UInt8 = 0x2
+    let slot: TransmitterSlot
 
-    init() {
+    init(slot: TransmitterSlot = .default) {
         let uuid = UUID().uuid
 
+        self.slot = slot
         singleUseToken = Data([uuid.0, uuid.1, uuid.2, uuid.3,
                                uuid.4, uuid.5, uuid.6, uuid.7])
     }
@@ -27,7 +28,7 @@ struct AuthRequestTxMessage: TransmitterTxMessage {
     var data: Data {
         var data = Data(for: .authRequestTx)
         data.append(singleUseToken)
-        data.append(endByte)
+        data.append(slot.rawValue)
         return data
     }
 }

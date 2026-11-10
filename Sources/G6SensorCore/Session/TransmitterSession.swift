@@ -154,6 +154,13 @@ public final class TransmitterSession: TransmitterSessioning, TransmitterConnect
     }
     private let lockedShouldReadBattery: Locked<Bool> = Locked(false)
 
+    /// The slot to authenticate on; applies from the next connection.
+    public var slot: TransmitterSlot {
+        get { lockedSlot.value }
+        set { lockedSlot.value = newValue }
+    }
+    private let lockedSlot: Locked<TransmitterSlot> = Locked(.default)
+
     /// When set, the next connection cycle requests backfill for the window.
     /// Cleared after a successful backfill delivery.
     public var requestedBackfillWindow: DateInterval? {
@@ -253,10 +260,12 @@ public final class TransmitterSession: TransmitterSessioning, TransmitterConnect
                 self.log.debug("Subscribing to authentication characteristic")
                 try peripheral.setNotifyValue(true, for: .authentication, timeout: Self.authTimeout)
 
-                self.log.debug("Authenticating with transmitter")
+                let slot = self.slot
+                self.log.debug("Authenticating with transmitter on slot %d", Int(slot.rawValue))
                 let started = Date()
-                let status = try peripheral.authenticate(id: self.id)
-                self.log.default("Authenticated in %{public}@s (bonded: %{public}@)",
+                let status = try peripheral.authenticate(id: self.id, slot: slot)
+                self.log.default("Authenticated on slot %d in %{public}@s (bonded: %{public}@)",
+                                 Int(slot.rawValue),
                                  String(format: "%.1f", Date().timeIntervalSince(started)),
                                  String(describing: status.isBonded))
 
@@ -576,8 +585,8 @@ extension TransmitterSession: CustomDebugStringConvertible {
 
 // MARK: - Helpers
 fileprivate extension PeripheralManager {
-    func authenticate(id: TransmitterID) throws -> AuthChallengeRxMessage {
-        let authMessage = AuthRequestTxMessage()
+    func authenticate(id: TransmitterID, slot: TransmitterSlot) throws -> AuthChallengeRxMessage {
+        let authMessage = AuthRequestTxMessage(slot: slot)
 
         guard let expectedTokenHash = id.computeHash(of: authMessage.singleUseToken) else {
             throw TransmitterError.authenticationError("Failed to compute token hash for transmitter ID")

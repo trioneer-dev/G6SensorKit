@@ -191,6 +191,7 @@ public final class G6CGMManager: CGMManager {
             "transmitterID: \(state.transmitterID)",
             "model: \(state.deviceModel)",
             "mode: \(state.passiveModeEnabled ? "passive" : "direct")",
+            "transmitterSlot: \(state.transmitterSlot.rawValue) (effective \(state.effectiveTransmitterSlot.rawValue))",
             "firmware: \(state.firmwareVersion ?? "unknown")",
             "isAnubis: \(state.isAnubis)",
             "sensorStartDate: \(String(describing: state.sensorStartDate))",
@@ -302,6 +303,7 @@ public final class G6CGMManager: CGMManager {
         } else {
             let active = TransmitterSession(id: state.transmitterID, peripheralIdentifier: state.peripheralIdentifier)
             active.commandSource = self
+            active.slot = state.effectiveTransmitterSlot
             session = active
         }
         session.delegate = self
@@ -399,6 +401,23 @@ public final class G6CGMManager: CGMManager {
         mutateState { state in
             state.sensorLifeDays = TransmitterManagerState.clampedSensorLifeDays(days)
         }
+    }
+
+    /// Takes effect on the next authentication.
+    public func setTransmitterSlot(_ slot: TransmitterSlot) {
+        guard slot != state.transmitterSlot else {
+            return
+        }
+
+        log.default("Bluetooth slot changed to %d", Int(slot.rawValue))
+        mutateState { state in
+            state.transmitterSlot = slot
+        }
+        applyTransmitterSlot()
+    }
+
+    private func applyTransmitterSlot() {
+        (session as? TransmitterSession)?.slot = state.effectiveTransmitterSlot
     }
 
     public func setShareUploadEnabled(_ enabled: Bool) {
@@ -514,6 +533,9 @@ public final class G6CGMManager: CGMManager {
             state.undeliveredCommand = nil
             state.lastSessionStartFailure = nil
         }
+
+        // The new transmitter is not known to be Anubis yet.
+        applyTransmitterSlot()
 
         connectionPhase = .searching
 
@@ -749,6 +771,10 @@ extension G6CGMManager: TransmitterSessionDelegate {
 
         if state.isAnubis && !wasAnubis {
             log.default("Anubis-modified transmitter detected (expiry %d days)", Int(message.transmitterExpiryInDays))
+        }
+
+        if state.isAnubis != wasAnubis {
+            applyTransmitterSlot()
         }
     }
 

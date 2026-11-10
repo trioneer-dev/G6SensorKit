@@ -1054,6 +1054,54 @@
     "Transmitter battery very low": {
       "comment": "Settings banner title when the transmitter battery is very low",
       "extractionState": "manual"
+    },
+    "Bluetooth Channel": {
+      "extractionState": "manual",
+      "comment": "Picker label for the transmitter Bluetooth slot"
+    },
+    "Use This Channel": {
+      "extractionState": "manual",
+      "comment": "Confirm switching the transmitter Bluetooth slot"
+    },
+    "Phone App (Default)": {
+      "extractionState": "manual",
+      "comment": "Bluetooth slot option: the Dexcom phone app slot"
+    },
+    "Receiver or Pump": {
+      "extractionState": "manual",
+      "comment": "Bluetooth slot option: the Dexcom receiver or pump slot"
+    },
+    "Anubis Extra": {
+      "extractionState": "manual",
+      "comment": "Bluetooth slot option: the third slot only Anubis transmitters have"
+    },
+    "This app uses the same Bluetooth channel as the Dexcom app. Change it only if another device, such as a watch, needs this channel.": {
+      "extractionState": "manual",
+      "comment": "Footer for the phone app Bluetooth slot"
+    },
+    "This app uses the channel normally kept for a Dexcom receiver or a pump, which leaves the phone app channel free for another device.": {
+      "extractionState": "manual",
+      "comment": "Footer for the receiver or pump Bluetooth slot"
+    },
+    "This app uses the extra channel only Anubis transmitters have, which leaves the other two free for other devices.": {
+      "extractionState": "manual",
+      "comment": "Footer for the Anubis extra Bluetooth slot"
+    },
+    "Use the receiver or pump channel?": {
+      "extractionState": "manual",
+      "comment": "Confirmation title for switching to the receiver or pump Bluetooth slot"
+    },
+    "Use the Anubis extra channel?": {
+      "extractionState": "manual",
+      "comment": "Confirmation title for switching to the Anubis extra Bluetooth slot"
+    },
+    "A Dexcom receiver, or a pump that gets glucose from this transmitter, uses this channel. If you have one, it will lose its connection and stop getting readings. Choose this only if no receiver or pump uses this transmitter. The change applies the next time this app connects.": {
+      "extractionState": "manual",
+      "comment": "Warning before switching to the receiver or pump Bluetooth slot"
+    },
+    "Only Anubis transmitters have this channel, and support for it is still being tested. If readings stop, switch back to Phone App. The change applies the next time this app connects.": {
+      "extractionState": "manual",
+      "comment": "Warning before switching to the Anubis extra Bluetooth slot"
     }
   },
   "version": "1.1"

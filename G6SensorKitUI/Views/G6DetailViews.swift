@@ -337,6 +337,12 @@ struct G6TransmitterDetailsView: View {
 
     @State private var showingDirectModeConfirmation = false
 
+    /// Mirrors the slot in use. A slot that can cut off another device is
+    /// confirmed before it is saved.
+    @State private var transmitterSlot = TransmitterSlot.default
+
+    @State private var pendingSlot: TransmitterSlot?
+
     var body: some View {
         List {
             // Top of the transmitter screen, matching where the
@@ -386,13 +392,49 @@ struct G6TransmitterDetailsView: View {
                 } message: {
                     Text(LocalizedString("Close the Dexcom app and turn off its Bluetooth access, or delete it, before switching. Only one app on this phone can talk to the transmitter; if the Dexcom app is still connected, the two will interfere and readings can be lost.", comment: "Warning shown before turning passive mode off"))
                 }
+
+                // Passive mode never authenticates, so it has no slot.
+                if !passiveModeEnabled {
+                    Picker(LocalizedString("Bluetooth Channel", comment: "Picker label for the transmitter Bluetooth slot"), selection: Binding(
+                        get: { transmitterSlot },
+                        set: { newValue in
+                            if newValue == .default {
+                                setTransmitterSlot(newValue)
+                            } else {
+                                pendingSlot = newValue
+                            }
+                        }
+                    )) {
+                        ForEach(TransmitterSlot.available(isAnubis: cgmManager.state.isAnubis), id: \.self) { slot in
+                            Text(slotName(slot)).tag(slot)
+                        }
+                    }
+                    .confirmationDialog(
+                        pendingSlot.map(slotConfirmationTitle) ?? "",
+                        isPresented: Binding(
+                            get: { pendingSlot != nil },
+                            set: { if !$0 { pendingSlot = nil } }
+                        ),
+                        titleVisibility: .visible,
+                        presenting: pendingSlot
+                    ) { slot in
+                        Button(LocalizedString("Use This Channel", comment: "Confirm switching the transmitter Bluetooth slot")) {
+                            setTransmitterSlot(slot)
+                        }
+                    } message: { slot in
+                        Text(slotWarning(slot))
+                    }
+                }
             } header: {
                 Text(LocalizedString("Connection", comment: "Transmitter details section header for connection mode"))
             } footer: {
                 if passiveModeEnabled {
                     Text(LocalizedString("Passive mode listens to the Dexcom G6 or ONE app on this phone, which must be installed and running a sensor session with this transmitter. Start, stop and calibrate from the Dexcom app.", comment: "Footer explaining passive mode"))
                 } else {
-                    Text(LocalizedString("Direct mode talks to the transmitter itself, which allows starting, stopping and calibrating sessions here. The Dexcom app must not be connected to this transmitter while direct mode is on.", comment: "Footer explaining direct mode"))
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(LocalizedString("Direct mode talks to the transmitter itself, which allows starting, stopping and calibrating sessions here. The Dexcom app must not be connected to this transmitter while direct mode is on.", comment: "Footer explaining direct mode"))
+                        Text(slotFooter(transmitterSlot))
+                    }
                 }
             }
 
@@ -439,12 +481,60 @@ struct G6TransmitterDetailsView: View {
 
         }
         .listStyle(.insetGrouped)
-        .onAppear { passiveModeEnabled = cgmManager.state.passiveModeEnabled }
+        .onAppear {
+            passiveModeEnabled = cgmManager.state.passiveModeEnabled
+            transmitterSlot = cgmManager.state.effectiveTransmitterSlot
+        }
     }
 
     private func setPassiveModeEnabled(_ enabled: Bool) {
         passiveModeEnabled = enabled
         cgmManager.setPassiveModeEnabled(enabled)
+    }
+
+    private func setTransmitterSlot(_ slot: TransmitterSlot) {
+        transmitterSlot = slot
+        cgmManager.setTransmitterSlot(slot)
+    }
+
+    private func slotName(_ slot: TransmitterSlot) -> String {
+        switch slot {
+        case .phoneApp:
+            return LocalizedString("Phone App (Default)", comment: "Bluetooth slot option: the Dexcom phone app slot")
+        case .receiverOrPump:
+            return LocalizedString("Receiver or Pump", comment: "Bluetooth slot option: the Dexcom receiver or pump slot")
+        case .anubisExtra:
+            return LocalizedString("Anubis Extra", comment: "Bluetooth slot option: the third slot only Anubis transmitters have")
+        }
+    }
+
+    private func slotFooter(_ slot: TransmitterSlot) -> String {
+        switch slot {
+        case .phoneApp:
+            return LocalizedString("This app uses the same Bluetooth channel as the Dexcom app. Change it only if another device, such as a watch, needs this channel.", comment: "Footer for the phone app Bluetooth slot")
+        case .receiverOrPump:
+            return LocalizedString("This app uses the channel normally kept for a Dexcom receiver or a pump, which leaves the phone app channel free for another device.", comment: "Footer for the receiver or pump Bluetooth slot")
+        case .anubisExtra:
+            return LocalizedString("This app uses the extra channel only Anubis transmitters have, which leaves the other two free for other devices.", comment: "Footer for the Anubis extra Bluetooth slot")
+        }
+    }
+
+    private func slotConfirmationTitle(_ slot: TransmitterSlot) -> String {
+        switch slot {
+        case .phoneApp, .receiverOrPump:
+            return LocalizedString("Use the receiver or pump channel?", comment: "Confirmation title for switching to the receiver or pump Bluetooth slot")
+        case .anubisExtra:
+            return LocalizedString("Use the Anubis extra channel?", comment: "Confirmation title for switching to the Anubis extra Bluetooth slot")
+        }
+    }
+
+    private func slotWarning(_ slot: TransmitterSlot) -> String {
+        switch slot {
+        case .phoneApp, .receiverOrPump:
+            return LocalizedString("A Dexcom receiver, or a pump that gets glucose from this transmitter, uses this channel. If you have one, it will lose its connection and stop getting readings. Choose this only if no receiver or pump uses this transmitter. The change applies the next time this app connects.", comment: "Warning before switching to the receiver or pump Bluetooth slot")
+        case .anubisExtra:
+            return LocalizedString("Only Anubis transmitters have this channel, and support for it is still being tested. If readings stop, switch back to Phone App. The change applies the next time this app connects.", comment: "Warning before switching to the Anubis extra Bluetooth slot")
+        }
     }
 
     private func row(_ label: String, _ value: String) -> some View {

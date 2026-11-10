@@ -101,6 +101,28 @@ Transmitter details:
   phone) drives. Session commands, calibrations, battery reads and backfill
   requests are unavailable; `enqueue(_:)` drops commands.
 
+### Bluetooth slot (direct mode)
+
+The last byte of the authentication request picks the transmitter slot. Each
+slot holds its own connection, so two devices can read one transmitter when
+they authenticate on different slots, for example a phone and a watch.
+
+| Slot | Byte | Transmitters |
+|---|---|---|
+| Phone app (default) | `0x02` | all |
+| Receiver or pump | `0x01` | all |
+| Anubis extra | `0x03` | Anubis only |
+
+The choice is persisted as `transmitterSlot` and applies on the next
+authentication. A stored Anubis slot falls back to the phone app slot until
+the transmitter is known to be Anubis, so the first connection to a new
+transmitter uses `0x02`. The receiver-or-pump slot cuts off a receiver or pump
+already using it; the settings screen warns before switching.
+
+Slot values follow xDrip+ (`endByteStd`/`endByteAlt`) and xDrip4iOS, which
+found the third Anubis slot and uses separate slots for its Direct to Watch
+collection. Thanks to both projects.
+
 `providesBLEHeartbeat` is `true` in direct mode and `false` in passive mode:
 in passive the manufacturer's app drives the cadence, so the host's own fetch
 timer must keep ticking.

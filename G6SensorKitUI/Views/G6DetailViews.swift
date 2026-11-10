@@ -110,7 +110,7 @@ struct G6CalibrationView: View {
         _viewModel = StateObject(wrappedValue: G6CalibrationViewModel(cgmManager: cgmManager))
     }
 
-    private var unit: HKUnit {
+    private var unit: LoopUnit {
         return displayGlucosePreference.unit
     }
 
@@ -122,8 +122,8 @@ struct G6CalibrationView: View {
         return Locale.current.decimalSeparator ?? "."
     }
 
-    private func quantity(fromMgDL value: Double) -> HKQuantity {
-        return HKQuantity(unit: .milligramsPerDeciliter, doubleValue: value)
+    private func quantity(fromMgDL value: Double) -> LoopQuantity {
+        return LoopQuantity(unit: .milligramsPerDeciliter, doubleValue: value)
     }
 
     private func formatted(mgdl value: Double) -> String {
@@ -143,7 +143,7 @@ struct G6CalibrationView: View {
     private var enteredMgDL: Double? {
         let normalized = entry.replacingOccurrences(of: decimalSeparator, with: ".")
         return Double(normalized).map {
-            HKQuantity(unit: unit, doubleValue: $0).doubleValue(for: .milligramsPerDeciliter)
+            LoopQuantity(unit: unit, doubleValue: $0).doubleValue(for: .milligramsPerDeciliter)
         }
     }
 

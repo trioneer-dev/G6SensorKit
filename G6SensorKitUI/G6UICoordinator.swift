@@ -323,11 +323,10 @@ public class G6UICoordinator: UINavigationController, CGMManagerOnboarding, Comp
         // must tear it down, or the host is left holding a CGM that was never
         // finished being set up.
         if let cgmManager = cgmManager, !cgmManager.isOnboarded {
-            cgmManager.delete { [weak self] in
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
-                    self.completionDelegate?.completionNotifyingDidComplete(self)
-                }
+            Task { @MainActor [weak self] in
+                await cgmManager.delete()
+                guard let self = self else { return }
+                self.completionDelegate?.completionNotifyingDidComplete(self)
             }
             self.cgmManager = nil
             return
@@ -545,11 +544,11 @@ public class G6UICoordinator: UINavigationController, CGMManagerOnboarding, Comp
     }
 
     private func deleteCGM() {
-        cgmManager?.delete { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.completionDelegate?.completionNotifyingDidComplete(self)
-            }
+        guard let cgmManager = cgmManager else { return }
+        Task { @MainActor [weak self] in
+            await cgmManager.delete()
+            guard let self = self else { return }
+            self.completionDelegate?.completionNotifyingDidComplete(self)
         }
     }
 }

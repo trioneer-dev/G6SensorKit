@@ -119,7 +119,9 @@ extension G6CGMManager {
             log.default("Issuing alert: %{public}@", alert.rawValue)
             let issued = alert.alert(managerIdentifier: Self.pluginIdentifier, delayed: delayed, undelivered: undelivered)
             delegateForAlerts.notify { delegate in
-                delegate?.issueAlert(issued)
+                Task {
+                    await delegate?.issueAlert(issued)
+                }
             }
         }
 
@@ -130,7 +132,9 @@ extension G6CGMManager {
                 alertIdentifier: alert.identifier
             )
             delegateForAlerts.notify { delegate in
-                delegate?.retractAlert(identifier: identifier)
+                Task {
+                    await delegate?.retractAlert(identifier: identifier)
+                }
             }
         }
 

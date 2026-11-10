@@ -25,8 +25,8 @@ struct G6ReadingDetailView: View {
 
     @EnvironmentObject private var displayGlucosePreference: DisplayGlucosePreference
 
-    private var glucoseQuantity: HKQuantity {
-        return HKQuantity(unit: .milligramsPerDeciliter, doubleValue: reading.glucoseMgDL)
+    private var glucoseQuantity: LoopQuantity {
+        return LoopQuantity(unit: .milligramsPerDeciliter, doubleValue: reading.glucoseMgDL)
     }
 
     var body: some View {
@@ -100,7 +100,7 @@ struct G6ReadingDetailView: View {
         guard let rate = reading.trendRateMgDLPerMinute else {
             return LocalizedString("Not available", comment: "Value when the transmitter reports no trend")
         }
-        let quantity = HKQuantity(unit: HKUnit.milligramsPerDeciliter.unitDivided(by: .minute()), doubleValue: rate)
+        let quantity = LoopQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: rate)
         return String(
             format: LocalizedString("%1$@%2$@ per minute", comment: "Trend rate (1: sign, 2: formatted rate with unit)"),
             rate > 0 ? "+" : "",

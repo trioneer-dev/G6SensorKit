@@ -538,7 +538,7 @@ public final class G6CGMManager: CGMManager {
         }
     }
 
-    public func delete(completion: @escaping () -> Void) {
+    public func delete() async {
         #if targetEnvironment(simulator)
         simulationTimer?.invalidate()
         simulationTimer = nil
@@ -549,7 +549,13 @@ public final class G6CGMManager: CGMManager {
         // Best-effort credential cleanup; failure to delete must not block.
         try? G6ShareCredentialStore(transmitterID: state.transmitterID).delete()
 
-        notifyDelegateOfDeletion(completion: completion)
+        // A deleted CGM's alerts must not outlive it.
+        let delegate = cgmManagerDelegate
+        for alert in G6Alert.allCases {
+            await delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: Self.pluginIdentifier, alertIdentifier: alert.identifier))
+        }
+        raisedAlerts = []
+        await delegate?.cgmManagerWantsDeletion(self)
     }
 
     // MARK: - CGMManager
@@ -577,9 +583,28 @@ public final class G6CGMManager: CGMManager {
     public var cgmManagerStatus: CGMManagerStatus {
         return CGMManagerStatus(
             hasValidSensorSession: hasValidSensorSession,
+            inSensorWarmup: state.sensorStartDate != nil && state.isInWarmup,
+            isInoperable: isInoperable,
             lastCommunicationDate: state.latestReading?.date,
             device: device
         )
+    }
+
+    public var inSignalLoss: Bool {
+        guard state.sensorStartDate != nil, !state.isInWarmup, let date = state.latestReading?.date else {
+            return false
+        }
+        return Date().timeIntervalSince(date) > Self.signalLossInterval
+    }
+
+    public var isInoperable: Bool {
+        if state.isTransmitterExpired || state.latestReading?.calibrationState.isSensorFailed == true {
+            return true
+        }
+        guard state.sensorStartDate != nil, let expiration = state.sensorExpirationDate else {
+            return false
+        }
+        return expiration <= Date()
     }
 
     public var device: HKDevice? {
@@ -643,7 +668,7 @@ public final class G6CGMManager: CGMManager {
 
     // MARK: - AlertResponder / AlertSoundVendor
 
-    public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier, completion: @escaping (Error?) -> Void) {
+    public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier) async throws {
         let alert = G6Alert(rawValue: alertIdentifier)
         alert.map { alert in
             log.default("Acknowledged alert: %{public}@", alert.rawValue)
@@ -653,7 +678,6 @@ public final class G6CGMManager: CGMManager {
                 state.undeliveredCommand?.acknowledged = true
             }
         }
-        completion(nil)
     }
 
     public func getSoundBaseURL() -> URL? {
@@ -897,11 +921,11 @@ extension G6CGMManager: TransmitterSessionDelegate {
 
         return NewGlucoseSample(
             date: glucose.readDate,
-            quantity: HKQuantity(unit: .milligramsPerDeciliter, doubleValue: value),
+            quantity: LoopQuantity(unit: .milligramsPerDeciliter, doubleValue: value),
             condition: glucoseCondition(for: value),
             trend: glucoseTrend(for: glucose),
             trendRate: glucose.trendRateMgDLPerMinute.map {
-                HKQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: $0)
+                LoopQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: $0)
             },
             isDisplayOnly: glucose.isDisplayOnly,
             wasUserEntered: false,
@@ -1055,9 +1079,9 @@ struct G6GlucoseDisplay: GlucoseDisplayable {
         return GlucoseTrend(rawValue: arrow.rawValue)
     }
 
-    var trendRate: HKQuantity? {
+    var trendRate: LoopQuantity? {
         return reading.trendRateMgDLPerMinute.map {
-            HKQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: $0)
+            LoopQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: $0)
         }
     }
 

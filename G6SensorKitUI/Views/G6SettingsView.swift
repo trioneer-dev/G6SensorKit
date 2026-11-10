@@ -415,7 +415,7 @@ struct G6SettingsView: View {
             if let reading = viewModel.state.latestReading, !viewModel.state.isInWarmup {
                 HStack(alignment: .firstTextBaseline) {
                     Text(displayGlucosePreference.format(
-                        HKQuantity(unit: .milligramsPerDeciliter, doubleValue: reading.glucoseMgDL),
+                        LoopQuantity(unit: .milligramsPerDeciliter, doubleValue: reading.glucoseMgDL),
                         includeUnit: false))
                         .font(.system(size: 44, weight: .semibold, design: .rounded))
                         .monospacedDigit()
@@ -439,7 +439,7 @@ struct G6SettingsView: View {
                         Text(String(format: LocalizedString("%1$@%2$@/min", comment: "Trend rate (1: sign, 2: formatted rate with unit)"),
                                     rate > 0 ? "+" : "",
                                     displayGlucosePreference.formatMinuteRate(
-                                        HKQuantity(unit: HKUnit.milligramsPerDeciliter.unitDivided(by: .minute()), doubleValue: rate),
+                                        LoopQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: rate),
                                         includeUnit: false)))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()

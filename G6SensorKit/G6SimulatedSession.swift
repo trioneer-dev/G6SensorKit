@@ -116,10 +116,10 @@ extension G6CGMManager {
 
         let sample = NewGlucoseSample(
             date: date,
-            quantity: HKQuantity(unit: .milligramsPerDeciliter, doubleValue: value),
+            quantity: LoopQuantity(unit: .milligramsPerDeciliter, doubleValue: value),
             condition: nil,
             trend: nil,
-            trendRate: HKQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: rate),
+            trendRate: LoopQuantity(unit: .milligramsPerDeciliterPerMinute, doubleValue: rate),
             isDisplayOnly: false,
             wasUserEntered: false,
             syncIdentifier: reading.syncIdentifier,

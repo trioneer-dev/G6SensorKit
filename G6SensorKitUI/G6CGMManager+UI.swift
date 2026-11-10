@@ -133,6 +133,15 @@ extension G6CGMManager: CGMManagerUI {
             )
         }
 
+        // Below signal loss: missing readings matter more than their cause.
+        if state.isBatteryVeryLow {
+            return G6StatusHighlight(
+                localizedMessage: LocalizedString("Transmitter Low", comment: "Status highlight when the transmitter battery is very low"),
+                imageName: "battery.0percent",
+                state: .warning
+            )
+        }
+
         return nil
     }
 

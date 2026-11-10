@@ -292,9 +292,35 @@ struct G6SettingsView: View {
                         .foregroundStyle(.orange)
                 }
             }
+
+            // Last, so the session's own status reads first and the battery
+            // explains it underneath.
+            if viewModel.state.isBatteryVeryLow {
+                batteryVeryLowRow
+            }
         } header: {
             Text(LocalizedString("Sensor", comment: "Settings section: sensor"))
         }
+    }
+
+    /// Shown while battery B reads very low; not dismissible, since only a
+    /// new transmitter fixes it.
+    private var batteryVeryLowRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "battery.0percent")
+                .font(.title2)
+                .foregroundStyle(.red)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(LocalizedString("Transmitter battery very low", comment: "Settings banner title when the transmitter battery is very low"))
+                    .font(.subheadline.weight(.semibold))
+                Text(LocalizedString("Readings may be missing or arrive late, and the transmitter may respond slowly or not at all — including to stopping a session or calibrating. Replace the transmitter as soon as you can, and check your glucose with a fingerstick meter if readings stop.", comment: "Settings banner body when the transmitter battery is very low"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 4)
+        .listRowBackground(Color.red.opacity(0.12))
     }
 
     private var lastReadingSection: some View {

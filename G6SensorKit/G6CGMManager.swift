@@ -332,7 +332,6 @@ public final class G6CGMManager: CGMManager {
             log.error("Dropping command %{public}@: passive mode cannot write to the transmitter", String(describing: command))
             return
         }
-        // The controller that shared this transmitter owns its session.
         guard !state.configuredByAnotherController else {
             log.error("Dropping command %{public}@: the session belongs to the controller that shared this transmitter", String(describing: command))
             return
@@ -544,7 +543,6 @@ public final class G6CGMManager: CGMManager {
             state.lastSessionStartFailure = nil
         }
 
-        // The new transmitter is not known to be Anubis yet.
         applyTransmitterSlot()
 
         connectionPhase = .searching
@@ -579,12 +577,10 @@ public final class G6CGMManager: CGMManager {
         session = nil
 
         // Best-effort credential cleanup; failure to delete must not block.
-        // A shared copy has no credentials of its own.
         if !state.configuredByAnotherController {
             try? G6ShareCredentialStore(transmitterID: state.transmitterID).delete()
         }
 
-        // A deleted CGM's alerts must not outlive it.
         let delegate = cgmManagerDelegate
         for alert in G6Alert.allCases {
             await delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: Self.pluginIdentifier, alertIdentifier: alert.identifier))
@@ -633,8 +629,7 @@ public final class G6CGMManager: CGMManager {
     }
 
     public var isInoperable: Bool {
-        // An expired transmitter keeps reading the session it is running;
-        // only once that has ended can it give no more readings.
+        // An expired transmitter keeps reading the session it is running.
         if state.isSensorFailed || (state.isTransmitterExpired && !state.hasActiveSession) {
             return true
         }

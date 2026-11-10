@@ -393,7 +393,6 @@ struct G6TransmitterDetailsView: View {
                     Text(LocalizedString("Close the Dexcom app and turn off its Bluetooth access, or delete it, before switching. Only one app on this phone can talk to the transmitter; if the Dexcom app is still connected, the two will interfere and readings can be lost.", comment: "Warning shown before turning passive mode off"))
                 }
 
-                // Passive mode never authenticates, so it has no slot.
                 if !passiveModeEnabled {
                     Picker(LocalizedString("Bluetooth Channel", comment: "Picker label for the transmitter Bluetooth slot"), selection: Binding(
                         get: { transmitterSlot },

@@ -837,6 +837,7 @@ extension G6CGMManager: TransmitterSessionDelegate {
         mutateState { state in
             state.transmitterStartDate = activationDate
         }
+        connectionPhase = .connected
     }
 
     public func transmitterSession(_ session: any TransmitterSessioning, didReadBattery message: BatteryStatusRxMessage) {

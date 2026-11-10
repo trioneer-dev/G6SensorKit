@@ -8,16 +8,21 @@
 
 /* Begin PBXBuildFile section */
 		068F65E11AF1419388CBD953 /* G6SensorKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9D531F0A53057A0235E7C192 /* G6SensorKitUI.framework */; };
+		0A40D51CEA7B0C816C8D0E62 /* LocalizedString.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54CADE8EBD6A8DBD34E5F08E /* LocalizedString.swift */; };
 		14589281DC7760165D5590E3 /* LoopKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B0799EB2EDF3A7864F7C5C2 /* LoopKit.framework */; };
 		1BFC8B0012423024BCEE84C4 /* Locked.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3695593AE5C331A21B37C828 /* Locked.swift */; };
+		1DA0D84292970652904D57A8 /* TimeInterval.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ED9872057F9AB73CCE989CF /* TimeInterval.swift */; };
+		2144ECC3B3D45CCAAF9E1B0B /* G6Alert.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFC51720925E26FFF9526D8 /* G6Alert.swift */; };
 		226AE1C008E3432034691E58 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DAF739DBBA35C93627B2A12C /* Assets.xcassets */; };
 		25B13BDAFD609EC61E01ED42 /* LocalizedString.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54CADE8EBD6A8DBD34E5F08E /* LocalizedString.swift */; };
+		2730FCCBA13B4348BA87E4AB /* G6SimulatedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB4FF079E0E059B0A2514C4 /* G6SimulatedSession.swift */; };
 		2921FB176CBA1E3FACF8C998 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8C69491E1F3F7F01BACF348A /* Localizable.xcstrings */; };
 		2A9D142A81AE191360B058B0 /* G6Alert.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFC51720925E26FFF9526D8 /* G6Alert.swift */; };
 		2C77CCC0A4FC873D451B1D9C /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2803D463F94F749B9B4C4480 /* Localizable.xcstrings */; };
 		2E9270FAE984E3B653790956 /* LoopKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B0799EB2EDF3A7864F7C5C2 /* LoopKit.framework */; };
 		332BA57D80F0D8A629C0881A /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F95502372EC14A32117B5F92 /* Foundation.framework */; };
 		3342E51E140EB78C3406DCFC /* G6SensorKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8B421AE8197339D306979939 /* G6SensorKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		394AD036DF1A762293904837 /* LoopKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B0799EB2EDF3A7864F7C5C2 /* LoopKit.framework */; };
 		39603B3649182CA37CE8237A /* G6CGMManager+UI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2C05844010D28B27D4E02D /* G6CGMManager+UI.swift */; };
 		3A518597A56D377383B5D384 /* G6CGMManagerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650CB121B3A64293DDF66491 /* G6CGMManagerState.swift */; };
 		3A7D53148400D95D5EBE9B20 /* G6Graphics.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC82866E887A9C466610864B /* G6Graphics.swift */; };
@@ -25,8 +30,11 @@
 		3D85A309CDAA70C948DB7D06 /* HKUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = C199CCC759EB31B7459FAF02 /* HKUnit.swift */; };
 		405A216F8D1752F1421D4887 /* LocalizedString.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4847E689C846CC527559717B /* LocalizedString.swift */; };
 		4159FE6F9D1C67AA7D355705 /* G6SimulatedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB4FF079E0E059B0A2514C4 /* G6SimulatedSession.swift */; };
+		4372C15938211A7BCB7EF667 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 689F1D5EA66AE8C0FC2F571C /* Foundation.framework */; };
 		51AA80EED323BB1051CCF352 /* G6SensorKitUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9D531F0A53057A0235E7C192 /* G6SensorKitUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5623B9849DDAC97251E7B413 /* G6CGMManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AB56C95B7CD81513D98B212 /* G6CGMManager.swift */; };
+		5CA33973DBB9A4E8F37E31AF /* G6ShareCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DBE6B77523AE6CF47FE179 /* G6ShareCredentialStore.swift */; };
+		68C01BC317395CAFACEFA28E /* G6AlertEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BFF9D322E96EE881F0910FD /* G6AlertEvaluator.swift */; };
 		6C6A5725B781F8EC0283A2E3 /* G6ActivityViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20A6B1AD620BB43E52CA138 /* G6ActivityViewController.swift */; };
 		77CD64A55933B10835781892 /* G6UICoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60451EC9CB88AAED72C7B4C0 /* G6UICoordinator.swift */; };
 		7A17394DCB757B79A35A9401 /* LoopKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 93F66577CA895DC0539B94DB /* LoopKitUI.framework */; };
@@ -36,18 +44,24 @@
 		84E98310287C4DAF8D376F5C /* G6SensorKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B421AE8197339D306979939 /* G6SensorKit.framework */; };
 		8587D2CC46C9C9CB94B2D3FA /* HKUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = E067B8007DAFB29BE2F03F48 /* HKUnit.swift */; };
 		85D8C77F66A1FF1AF57A8F17 /* G6ApplySensorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5C11477C372E423D1838A5 /* G6ApplySensorViews.swift */; };
+		8B27DD02EF3DD9AF37ACA91B /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2803D463F94F749B9B4C4480 /* Localizable.xcstrings */; };
 		9068DC2E9303B2620EC57AF2 /* G6AlertEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BFF9D322E96EE881F0910FD /* G6AlertEvaluator.swift */; };
 		9068DD5A9EB5430807D21AE5 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F95502372EC14A32117B5F92 /* Foundation.framework */; };
 		934EFF804E6452CD19F40C04 /* G6CalibrationGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F99764DE6442A33728920B /* G6CalibrationGuideView.swift */; };
 		9D23800E9E278C62602AAF06 /* G6SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB76778EA2C3FE465AE8FC8F /* G6SettingsView.swift */; };
 		ABC18A66F55CAC750FAAA781 /* TimeInterval.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ED9872057F9AB73CCE989CF /* TimeInterval.swift */; };
+		AD55C405E3877C5843955964 /* G6CGMManagerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650CB121B3A64293DDF66491 /* G6CGMManagerState.swift */; };
 		CF81E72F011FD1971AA15AA2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F95502372EC14A32117B5F92 /* Foundation.framework */; };
 		D48D98C13312034AB8C11BA8 /* G6DetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABB63314B843491AD67FAFB8 /* G6DetailViews.swift */; };
+		D8A0CCEB1F717AEFA01BD72E /* G6CGMManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AB56C95B7CD81513D98B212 /* G6CGMManager.swift */; };
 		DA3B54D9184C892B5F9A7B96 /* G6OnboardingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BCCCBFAEC5AC32DCB17C0E0 /* G6OnboardingViews.swift */; };
+		E1DC8ACFCF197FAEEF58DD9E /* HKUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = C199CCC759EB31B7459FAF02 /* HKUnit.swift */; };
 		E5928066DDD984FCE765E888 /* G6PackageScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8E7A171900BF409A482908 /* G6PackageScannerView.swift */; };
 		EE9148D1635A031059CB0474 /* OSLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B2202DFC274BBEC075ADF5E /* OSLog.swift */; };
 		F3BF96B43DC44EAB997C9556 /* G6ReadingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9773F6BB69F46104A715B09 /* G6ReadingDetailView.swift */; };
 		F5B695198564172CA054D830 /* LoopKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 93F66577CA895DC0539B94DB /* LoopKitUI.framework */; };
+		FA9106AB5377CAD532780698 /* OSLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B2202DFC274BBEC075ADF5E /* OSLog.swift */; };
+		FEA4B838EC788952378A96BE /* Locked.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3695593AE5C331A21B37C828 /* Locked.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -90,6 +104,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0AF5442829113E6F3F5C8B50 /* G6SensorKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; name = G6SensorKit.framework; path = G6SensorKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		14F99764DE6442A33728920B /* G6CalibrationGuideView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = G6CalibrationGuideView.swift; path = Views/G6CalibrationGuideView.swift; sourceTree = "<group>"; };
 		1B0799EB2EDF3A7864F7C5C2 /* LoopKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LoopKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		2803D463F94F749B9B4C4480 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -102,6 +117,7 @@
 		5BFF9D322E96EE881F0910FD /* G6AlertEvaluator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = G6AlertEvaluator.swift; sourceTree = "<group>"; };
 		60451EC9CB88AAED72C7B4C0 /* G6UICoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = G6UICoordinator.swift; sourceTree = "<group>"; };
 		650CB121B3A64293DDF66491 /* G6CGMManagerState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = G6CGMManagerState.swift; sourceTree = "<group>"; };
+		689F1D5EA66AE8C0FC2F571C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS11.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		6BCCCBFAEC5AC32DCB17C0E0 /* G6OnboardingViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = G6OnboardingViews.swift; path = Views/G6OnboardingViews.swift; sourceTree = "<group>"; };
 		6D5C11477C372E423D1838A5 /* G6ApplySensorViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = G6ApplySensorViews.swift; path = Views/G6ApplySensorViews.swift; sourceTree = "<group>"; };
 		6ED9872057F9AB73CCE989CF /* TimeInterval.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimeInterval.swift; sourceTree = "<group>"; };
@@ -127,6 +143,15 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		129C01A1D6597B3DBCD506BB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4372C15938211A7BCB7EF667 /* Foundation.framework in Frameworks */,
+				394AD036DF1A762293904837 /* LoopKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		29459DDF79C2F6E84E026198 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -168,8 +193,17 @@
 				8B421AE8197339D306979939 /* G6SensorKit.framework */,
 				9D531F0A53057A0235E7C192 /* G6SensorKitUI.framework */,
 				A1A4A5B6A02A6007C52230EE /* G6SensorKitPlugin.framework */,
+				0AF5442829113E6F3F5C8B50 /* G6SensorKit.framework */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		60805FF3054F107E1678210C /* watchOS */ = {
+			isa = PBXGroup;
+			children = (
+				689F1D5EA66AE8C0FC2F571C /* Foundation.framework */,
+			);
+			name = watchOS;
 			sourceTree = "<group>";
 		};
 		7CAD88E09B3DB8C98B60678D /* iOS */ = {
@@ -237,6 +271,7 @@
 				1B0799EB2EDF3A7864F7C5C2 /* LoopKit.framework */,
 				93F66577CA895DC0539B94DB /* LoopKitUI.framework */,
 				7CAD88E09B3DB8C98B60678D /* iOS */,
+				60805FF3054F107E1678210C /* watchOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -273,6 +308,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		7ADBA84EA66B2BBAFD4A6288 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE1B61E54F75F98599854183 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -329,6 +371,27 @@
 			productReference = 9D531F0A53057A0235E7C192 /* G6SensorKitUI.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		9168D2CE8C2577C8E36D0938 /* G6SensorKit-watchOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B7A69016BF7882C8700F4DDD /* Build configuration list for PBXNativeTarget "G6SensorKit-watchOS" */;
+			buildPhases = (
+				EE1B61E54F75F98599854183 /* Headers */,
+				065F30EE6824907A4FEA7BE7 /* Sources */,
+				129C01A1D6597B3DBCD506BB /* Frameworks */,
+				36E8D5D725EE067150A40BFB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "G6SensorKit-watchOS";
+			packageProductDependencies = (
+				94B651AF4B4C8B853882E3E6 /* G6SensorCore */,
+			);
+			productName = "G6SensorKit-watchOS";
+			productReference = 0AF5442829113E6F3F5C8B50 /* G6SensorKit.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 		D09D95523AA824744122C1CB /* G6SensorKitPlugin */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = FCDA3AF29E0740002157A96C /* Build configuration list for PBXNativeTarget "G6SensorKitPlugin" */;
@@ -380,11 +443,20 @@
 				215CD1147465A2E980A94D63 /* G6SensorKit */,
 				8F3461A960A54D2320B21FE4 /* G6SensorKitUI */,
 				D09D95523AA824744122C1CB /* G6SensorKitPlugin */,
+				9168D2CE8C2577C8E36D0938 /* G6SensorKit-watchOS */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		36E8D5D725EE067150A40BFB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8B27DD02EF3DD9AF37ACA91B /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6D20D7C6745342F8C65404B0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -412,6 +484,24 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		065F30EE6824907A4FEA7BE7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2144ECC3B3D45CCAAF9E1B0B /* G6Alert.swift in Sources */,
+				68C01BC317395CAFACEFA28E /* G6AlertEvaluator.swift in Sources */,
+				D8A0CCEB1F717AEFA01BD72E /* G6CGMManager.swift in Sources */,
+				AD55C405E3877C5843955964 /* G6CGMManagerState.swift in Sources */,
+				5CA33973DBB9A4E8F37E31AF /* G6ShareCredentialStore.swift in Sources */,
+				2730FCCBA13B4348BA87E4AB /* G6SimulatedSession.swift in Sources */,
+				E1DC8ACFCF197FAEEF58DD9E /* HKUnit.swift in Sources */,
+				0A40D51CEA7B0C816C8D0E62 /* LocalizedString.swift in Sources */,
+				FEA4B838EC788952378A96BE /* Locked.swift in Sources */,
+				FA9106AB5377CAD532780698 /* OSLog.swift in Sources */,
+				1DA0D84292970652904D57A8 /* TimeInterval.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		30F8F65AC6C7D52F848495B9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -482,6 +572,41 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		1727F5E0DCBE103E9BF97431 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				INFOPLIST_FILE = G6SensorKit/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.nightscout.G6SensorKit;
+				PRODUCT_NAME = G6SensorKit;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 4;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
+			};
+			name = Debug;
+		};
 		3A87E12D403C48B6C4E16BCA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -580,6 +705,42 @@
 				SWIFT_VERSION = 5.9;
 			};
 			name = Debug;
+		};
+		682A12DB876941BAACCEBD42 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				INFOPLIST_FILE = G6SensorKit/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.nightscout.G6SensorKit;
+				PRODUCT_NAME = G6SensorKit;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
+			};
+			name = Release;
 		};
 		6965477C499968CA83551725 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -832,6 +993,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		B7A69016BF7882C8700F4DDD /* Build configuration list for PBXNativeTarget "G6SensorKit-watchOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				682A12DB876941BAACCEBD42 /* Release */,
+				1727F5E0DCBE103E9BF97431 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		DD280BDB51D34244226439F4 /* Build configuration list for PBXNativeTarget "G6SensorKit" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -861,6 +1031,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		0EC90A7F507FA56DA0FAAC1D /* G6SensorCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = G6SensorCore;
+		};
+		94B651AF4B4C8B853882E3E6 /* G6SensorCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = G6SensorCore;
 		};

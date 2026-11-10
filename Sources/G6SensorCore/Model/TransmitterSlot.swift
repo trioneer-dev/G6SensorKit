@@ -38,4 +38,12 @@ public enum TransmitterSlot: UInt8, CaseIterable {
     public func resolved(isAnubis: Bool) -> TransmitterSlot {
         Self.available(isAnubis: isAnubis).contains(self) ? self : .default
     }
+
+    /// The slot for a second device reading alongside one on `slot`, such as
+    /// a watch: the Anubis extra slot when there is one, otherwise the
+    /// receiver-or-pump slot, and never `slot` itself.
+    public static func secondary(alongside slot: TransmitterSlot, isAnubis: Bool) -> TransmitterSlot {
+        let available = available(isAnubis: isAnubis)
+        return [.anubisExtra, .receiverOrPump, .phoneApp].first { $0 != slot && available.contains($0) }!
+    }
 }

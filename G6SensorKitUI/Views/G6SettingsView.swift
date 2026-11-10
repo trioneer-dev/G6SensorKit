@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import WatchConnectivity
 import HealthKit
 import LoopKit
 import LoopKitUI
@@ -186,6 +187,28 @@ final class G6SettingsViewModel: ObservableObject, G6CGMManagerObserver {
     /// Headline battery level for the settings row; nil until the first
     /// battery read, so the row stays hidden for transmitters we have
     /// never heard battery from.
+    // MARK: - Watch direct read
+
+    /// Offered when the host supports it and a paired watch has the app
+    /// installed, or while it is on.
+    var showsWatchDirectRead: Bool {
+        guard cgmManager.cgmManagerDelegate?.supportsWatchDirectRead(for: cgmManager) == true else {
+            return false
+        }
+        if state.watchDirectReadEnabled {
+            return true
+        }
+        guard WCSession.isSupported() else {
+            return false
+        }
+        let session = WCSession.default
+        return session.activationState == .activated && session.isPaired && session.isWatchAppInstalled
+    }
+
+    func setWatchDirectReadEnabled(_ enabled: Bool) {
+        cgmManager.setWatchDirectReadEnabled(enabled)
+    }
+
     var batteryLevelText: String? {
         switch state.batteryLevel {
         case .unknown:
@@ -276,6 +299,7 @@ struct G6SettingsView: View {
     @State private var showingStopConfirmation = false
     @State private var showingLogShare = false
     @State private var showingDeleteConfirmation = false
+    @State private var showingWatchConfirmation = false
 
     var body: some View {
         List {
@@ -285,6 +309,9 @@ struct G6SettingsView: View {
             metadataSection
             actionsSection
             detailsSection
+            if viewModel.showsWatchDirectRead {
+                watchDirectReadSection
+            }
             deleteSection
         }
         .listStyle(.insetGrouped)
@@ -626,6 +653,50 @@ struct G6SettingsView: View {
         // A plain .foregroundStyle(.primary) here would override the system's
         // disabled dimming; the style defers to the environment instead.
         .buttonStyle(G6RowButtonStyle())
+    }
+
+    // MARK: - Apple Watch
+
+    /// The watch reads the transmitter itself, on a slot the phone does not use.
+    private var watchDirectReadSection: some View {
+        Section {
+            Toggle(LocalizedString("Read on Apple Watch", comment: "Toggle for the watch reading the G6 transmitter directly"), isOn: Binding(
+                get: { viewModel.state.watchDirectReadEnabled },
+                set: { enabled in
+                    if enabled {
+                        showingWatchConfirmation = true
+                    } else {
+                        viewModel.setWatchDirectReadEnabled(false)
+                    }
+                }
+            ))
+            .confirmationDialog(
+                LocalizedString("Read on Apple Watch?", comment: "Confirmation title for the watch reading the G6 transmitter directly"),
+                isPresented: $showingWatchConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(LocalizedString("Turn On", comment: "Confirm the watch reading the G6 transmitter directly")) {
+                    viewModel.setWatchDirectReadEnabled(true)
+                }
+            } message: {
+                Text(watchSlotWarning(viewModel.state.secondaryTransmitterSlot))
+            }
+        } header: {
+            Text(LocalizedString("Apple Watch", comment: "Section title for the watch reading the G6 transmitter directly"))
+        } footer: {
+            Text(LocalizedString("The watch connects to the transmitter on its own Bluetooth channel, so it keeps getting readings when your phone is out of range. The watch only reads glucose. Starting, stopping and calibrating stay on this phone.", comment: "Footer explaining the watch reading the G6 transmitter directly"))
+        }
+    }
+
+    private func watchSlotWarning(_ slot: TransmitterSlot) -> String {
+        switch slot {
+        case .receiverOrPump:
+            return LocalizedString("The watch will use the channel a Dexcom receiver or a pump uses. If a receiver or pump gets glucose from this transmitter, it will lose its connection and stop getting readings. Turn this on only if no receiver or pump uses this transmitter.", comment: "Warning before the watch takes the receiver or pump Bluetooth slot")
+        case .phoneApp:
+            return LocalizedString("The watch will use the Dexcom app's channel. The Dexcom app must not be connected to this transmitter while the watch reads it.", comment: "Warning before the watch takes the phone app Bluetooth slot")
+        case .anubisExtra:
+            return LocalizedString("The watch will use the extra channel only Anubis transmitters have. Support for it is still being tested. If the watch stops getting readings, turn this off.", comment: "Warning before the watch takes the Anubis extra Bluetooth slot")
+        }
     }
 
     // MARK: - Delete

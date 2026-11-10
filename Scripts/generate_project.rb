@@ -21,6 +21,7 @@ ROOT = File.expand_path('..', __dir__)
 PROJECT_PATH = File.join(ROOT, 'G6SensorKit.xcodeproj')
 
 DEPLOYMENT_TARGET = '17.6'
+WATCHOS_DEPLOYMENT_TARGET = '10.6'
 SWIFT_VERSION = '5.9'
 BUNDLE_PREFIX = 'org.nightscout'
 
@@ -185,6 +186,44 @@ unless core_resource_dirs.empty?
   MESSAGE
 end
 
+# ======================================= G6SensorKit.framework (watchOS)
+
+# The same sources and module name for a watch app that reads the transmitter
+# itself from the phone's shared configuration (DeviceConfigurationSharing).
+# It links the host's LoopKit-watchOS, which also builds as LoopKit.framework.
+def add_watch_kit(project, kit, loopkit_ref)
+  watch = project.new_target(:framework, 'G6SensorKit-watchOS', :watchos, WATCHOS_DEPLOYMENT_TARGET)
+  watch.build_configurations.each do |config|
+    config.build_settings.merge!(base_settings(DEPLOYMENT_TARGET, SWIFT_VERSION))
+    config.build_settings.delete('IPHONEOS_DEPLOYMENT_TARGET')
+    config.build_settings.merge!(
+      'PRODUCT_NAME' => 'G6SensorKit',
+      'PRODUCT_BUNDLE_IDENTIFIER' => "#{BUNDLE_PREFIX}.G6SensorKit",
+      'INFOPLIST_FILE' => 'G6SensorKit/Info.plist',
+      'FRAMEWORK_SEARCH_PATHS' => ['$(inherited)', '$(BUILT_PRODUCTS_DIR)'],
+      'SDKROOT' => 'watchos',
+      'SUPPORTED_PLATFORMS' => 'watchos watchsimulator',
+      'TARGETED_DEVICE_FAMILY' => '4',
+      'WATCHOS_DEPLOYMENT_TARGET' => WATCHOS_DEPLOYMENT_TARGET
+    )
+  end
+  watch.product_reference.path = 'G6SensorKit.framework'
+  watch.product_reference.name = 'G6SensorKit.framework'
+
+  watch.add_file_references(kit.source_build_phase.files_references)
+  kit.resources_build_phase.files_references.each do |ref|
+    watch.resources_build_phase.add_file_reference(ref, true)
+  end
+  watch.frameworks_build_phase.add_file_reference(loopkit_ref, true)
+
+  core = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+  core.product_name = 'G6SensorCore'
+  watch.package_product_dependencies << core
+  watch
+end
+
+kit_watch = add_watch_kit(project, kit, loopkit_ref)
+
 # =============================================== G6SensorKitUI.framework
 
 kitui = project.new_target(:framework, 'G6SensorKitUI', :ios, DEPLOYMENT_TARGET)
@@ -263,12 +302,12 @@ project.main_group.children.replace(sorted)
 
 project.save
 
-[kit, kitui, plugin].each do |target|
+[kit, kit_watch, kitui, plugin].each do |target|
   scheme = Xcodeproj::XCScheme.new
   scheme.add_build_target(target)
   scheme.save_as(PROJECT_PATH, target.name, true)
 end
 
 puts "Generated #{PROJECT_PATH}"
-puts 'Targets: G6SensorKit, G6SensorKitUI, G6SensorKitPlugin (.loopplugin)'
+puts 'Targets: G6SensorKit, G6SensorKit-watchOS, G6SensorKitUI, G6SensorKitPlugin (.loopplugin)'
 puts 'Note: builds only inside a host workspace that provides LoopKit + LoopKitUI.'

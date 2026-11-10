@@ -33,4 +33,11 @@ class TransmitterSlotTests: XCTestCase {
         XCTAssertEqual(TransmitterSlot.anubisExtra.resolved(isAnubis: true), .anubisExtra)
         XCTAssertEqual(TransmitterSlot.receiverOrPump.resolved(isAnubis: false), .receiverOrPump)
     }
+
+    func testSecondarySlotNeverMatchesThePrimary() {
+        XCTAssertEqual(TransmitterSlot.secondary(alongside: .phoneApp, isAnubis: false), .receiverOrPump)
+        XCTAssertEqual(TransmitterSlot.secondary(alongside: .receiverOrPump, isAnubis: false), .phoneApp)
+        XCTAssertEqual(TransmitterSlot.secondary(alongside: .phoneApp, isAnubis: true), .anubisExtra)
+        XCTAssertEqual(TransmitterSlot.secondary(alongside: .anubisExtra, isAnubis: true), .receiverOrPump)
+    }
 }

@@ -13,6 +13,7 @@ let package = Package(
     name: "G6SensorCore",
     platforms: [
         .iOS(.v17),
+        .watchOS(.v10),
         .macOS(.v13),
     ],
     products: [

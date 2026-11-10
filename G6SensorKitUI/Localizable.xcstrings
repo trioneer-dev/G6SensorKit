@@ -1102,6 +1102,38 @@
     "Only Anubis transmitters have this channel, and support for it is still being tested. If readings stop, switch back to Phone App. The change applies the next time this app connects.": {
       "extractionState": "manual",
       "comment": "Warning before switching to the Anubis extra Bluetooth slot"
+    },
+    "Read on Apple Watch": {
+      "extractionState": "manual",
+      "comment": "Toggle for the watch reading the G6 transmitter directly"
+    },
+    "Read on Apple Watch?": {
+      "extractionState": "manual",
+      "comment": "Confirmation title for the watch reading the G6 transmitter directly"
+    },
+    "Turn On": {
+      "extractionState": "manual",
+      "comment": "Confirm the watch reading the G6 transmitter directly"
+    },
+    "Apple Watch": {
+      "extractionState": "manual",
+      "comment": "Section title for the watch reading the G6 transmitter directly"
+    },
+    "The watch connects to the transmitter on its own Bluetooth channel, so it keeps getting readings when your phone is out of range. The watch only reads glucose. Starting, stopping and calibrating stay on this phone.": {
+      "extractionState": "manual",
+      "comment": "Footer explaining the watch reading the G6 transmitter directly"
+    },
+    "The watch will use the channel a Dexcom receiver or a pump uses. If a receiver or pump gets glucose from this transmitter, it will lose its connection and stop getting readings. Turn this on only if no receiver or pump uses this transmitter.": {
+      "extractionState": "manual",
+      "comment": "Warning before the watch takes the receiver or pump Bluetooth slot"
+    },
+    "The watch will use the Dexcom app's channel. The Dexcom app must not be connected to this transmitter while the watch reads it.": {
+      "extractionState": "manual",
+      "comment": "Warning before the watch takes the phone app Bluetooth slot"
+    },
+    "The watch will use the extra channel only Anubis transmitters have. Support for it is still being tested. If the watch stops getting readings, turn this off.": {
+      "extractionState": "manual",
+      "comment": "Warning before the watch takes the Anubis extra Bluetooth slot"
     }
   },
   "version": "1.1"

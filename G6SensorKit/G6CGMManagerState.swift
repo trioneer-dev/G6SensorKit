@@ -109,6 +109,14 @@ public struct G6CGMManagerState: RawRepresentable {
     /// re-sent; kept so the user is told and can act on it.
     public var undeliveredCommand: UndeliveredCommand?
 
+    /// Built from another controller's shared configuration, as on a watch:
+    /// it reads the transmitter on its own slot and never sends commands.
+    public var configuredByAnotherController = false
+
+    /// The Read on Apple Watch setting: the host passes this transmitter to
+    /// its watch only while it is on.
+    public var watchDirectReadEnabled = false
+
     // MARK: - Battery
 
     /// Hundredths of a volt (310 is 3.10 V).
@@ -265,6 +273,8 @@ public struct G6CGMManagerState: RawRepresentable {
         batteryRuntimeDays = rawValue["batteryRuntimeDays"] as? Int
         batteryTemperature = rawValue["batteryTemperature"] as? Int
         lastBatteryReadDate = rawValue["lastBatteryReadDate"] as? Date
+        configuredByAnotherController = rawValue["configuredByAnotherController"] as? Bool ?? false
+        watchDirectReadEnabled = rawValue["watchDirectReadEnabled"] as? Bool ?? false
     }
 
     public var rawValue: RawValue {
@@ -299,6 +309,12 @@ public struct G6CGMManagerState: RawRepresentable {
         if transmitterSlot != .default {
             raw["transmitterSlot"] = Int(transmitterSlot.rawValue)
         }
+        if configuredByAnotherController {
+            raw["configuredByAnotherController"] = true
+        }
+        if watchDirectReadEnabled {
+            raw["watchDirectReadEnabled"] = true
+        }
         raw["setupStep"] = setupStep?.rawValue
         if !pendingCommands.isEmpty {
             raw["pendingCommands"] = pendingCommands
@@ -328,6 +344,46 @@ public struct G6CGMManagerState: RawRepresentable {
     /// transmitter accepts it, otherwise the default.
     public var effectiveTransmitterSlot: TransmitterSlot {
         return transmitterSlot.resolved(isAnubis: isAnubis)
+    }
+
+    /// The slot a watch reading alongside this phone takes. In passive mode
+    /// the Dexcom app holds the phone app slot.
+    public var secondaryTransmitterSlot: TransmitterSlot {
+        return TransmitterSlot.secondary(alongside: passiveModeEnabled ? .phoneApp : effectiveTransmitterSlot, isAnubis: isAnubis)
+    }
+
+    /// What a watch needs to read this transmitter itself: its ID, activation,
+    /// lifetime and the slot to use. The session start comes with its readings;
+    /// the link, readings and commands stay with this controller.
+    var sharedState: RawValue {
+        var shared = G6CGMManagerState(
+            transmitterID: transmitterID,
+            transmitterStartDate: transmitterStartDate,
+            transmitterSlot: secondaryTransmitterSlot,
+            transmitterExpiryInDays: transmitterExpiryInDays,
+            sensorLifeDays: sensorLifeDays,
+            isOnboarded: true
+        )
+        shared.configuredByAnotherController = true
+        return shared.rawValue
+    }
+
+    /// Another controller's shared state as a manager of its own, reading
+    /// directly on the slot that controller picked for it.
+    static func adopted(from shared: RawValue) -> G6CGMManagerState? {
+        guard let passed = G6CGMManagerState(rawValue: shared), passed.configuredByAnotherController else {
+            return nil
+        }
+        var state = G6CGMManagerState(
+            transmitterID: passed.transmitterID,
+            transmitterStartDate: passed.transmitterStartDate,
+            transmitterSlot: passed.transmitterSlot,
+            transmitterExpiryInDays: passed.transmitterExpiryInDays,
+            sensorLifeDays: passed.sensorLifeDays,
+            isOnboarded: true
+        )
+        state.configuredByAnotherController = true
+        return state
     }
 
     public var warmupPeriod: TimeInterval {
@@ -546,6 +602,8 @@ extension G6CGMManagerState: Equatable {
             && lhs.batteryRuntimeDays == rhs.batteryRuntimeDays
             && lhs.batteryTemperature == rhs.batteryTemperature
             && lhs.lastBatteryReadDate == rhs.lastBatteryReadDate
+            && lhs.configuredByAnotherController == rhs.configuredByAnotherController
+            && lhs.watchDirectReadEnabled == rhs.watchDirectReadEnabled
             && NSArray(array: lhs.pendingCommands) == NSArray(array: rhs.pendingCommands)
     }
 }

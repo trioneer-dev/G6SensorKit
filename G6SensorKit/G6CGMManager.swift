@@ -48,6 +48,10 @@ public final class G6CGMManager: CGMManager {
 
     public static let pluginIdentifier = "G6SensorKit"
 
+    /// Posted on the main queue whenever observers are notified; the object
+    /// is the manager.
+    public static let statusDidChange = Notification.Name("G6CGMManagerStatusDidChange")
+
     public var pluginIdentifier: String {
         return Self.pluginIdentifier
     }
@@ -280,6 +284,7 @@ public final class G6CGMManager: CGMManager {
             for observer in observers {
                 observer.g6CGMManagerDidUpdateState(self)
             }
+            NotificationCenter.default.post(name: Self.statusDidChange, object: self)
         }
     }
 
@@ -325,6 +330,11 @@ public final class G6CGMManager: CGMManager {
         // the backstop.
         guard !state.passiveModeEnabled else {
             log.error("Dropping command %{public}@: passive mode cannot write to the transmitter", String(describing: command))
+            return
+        }
+        // The controller that shared this transmitter owns its session.
+        guard !state.configuredByAnotherController else {
+            log.error("Dropping command %{public}@: the session belongs to the controller that shared this transmitter", String(describing: command))
             return
         }
 
@@ -569,7 +579,10 @@ public final class G6CGMManager: CGMManager {
         session = nil
 
         // Best-effort credential cleanup; failure to delete must not block.
-        try? G6ShareCredentialStore(transmitterID: state.transmitterID).delete()
+        // A shared copy has no credentials of its own.
+        if !state.configuredByAnotherController {
+            try? G6ShareCredentialStore(transmitterID: state.transmitterID).delete()
+        }
 
         // A deleted CGM's alerts must not outlive it.
         let delegate = cgmManagerDelegate
@@ -708,6 +721,44 @@ public final class G6CGMManager: CGMManager {
 
     public func getSounds() -> [Alert.Sound] {
         return []
+    }
+}
+
+
+// MARK: - DeviceConfigurationSharing
+
+extension G6CGMManager: DeviceConfigurationSharing {
+
+    /// Reads the transmitter another controller shares, on the slot that
+    /// controller picked so the two never take each other's connection.
+    public convenience init?(adopting configuration: SharedDeviceConfiguration, localState: [String: Any]?) {
+        guard let state = G6CGMManagerState.adopted(from: configuration.state) else {
+            return nil
+        }
+        self.init(state: state)
+    }
+
+    public func exportConfiguration() -> SharedDeviceConfiguration {
+        return SharedDeviceConfiguration(managerIdentifier: pluginIdentifier, asOf: Date(), state: state.sharedState)
+    }
+
+    public var isConfigurationSharingEnabled: Bool {
+        return state.watchDirectReadEnabled
+    }
+
+    public func setWatchDirectReadEnabled(_ enabled: Bool) {
+        guard enabled != state.watchDirectReadEnabled else {
+            return
+        }
+        log.default("Read on Apple Watch turned %{public}@ (watch slot %d)", enabled ? "on" : "off", state.secondaryTransmitterSlot.rawValue)
+        mutateState { state in
+            state.watchDirectReadEnabled = enabled
+        }
+    }
+
+    /// Re-arms the connection, for a host woken in the background.
+    public func recheckAcquisition() {
+        session?.start()
     }
 }
 

@@ -633,7 +633,7 @@ public final class G6CGMManager: CGMManager {
     }
 
     public var isInoperable: Bool {
-        if state.isTransmitterExpired || state.latestReading?.calibrationState.isSensorFailed == true {
+        if state.isTransmitterExpired || state.isSensorFailed {
             return true
         }
         guard state.sensorStartDate != nil, let expiration = state.sensorExpirationDate else {

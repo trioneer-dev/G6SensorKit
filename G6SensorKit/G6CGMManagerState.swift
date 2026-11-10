@@ -422,6 +422,12 @@ public struct G6CGMManagerState: RawRepresentable {
 
     /// Past its reported lifetime. An expired transmitter still authenticates
     /// and answers reads, but refuses to start a new sensor session.
+    /// The transmitter's latest reading says the sensor has failed. Failed
+    /// readings carry no usable glucose, so `latestReading` never shows it.
+    public var isSensorFailed: Bool {
+        return algorithmStateRawValue.map { CalibrationState(rawValue: $0).isSensorFailed } ?? false
+    }
+
     public var isTransmitterExpired: Bool {
         guard let expiration = transmitterExpirationDate else {
             return false

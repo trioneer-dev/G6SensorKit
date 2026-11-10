@@ -352,13 +352,14 @@ public struct G6CGMManagerState: RawRepresentable {
         return TransmitterSlot.secondary(alongside: passiveModeEnabled ? .phoneApp : effectiveTransmitterSlot, isAnubis: isAnubis)
     }
 
-    /// What a watch needs to read this transmitter itself: its ID, activation,
-    /// lifetime and the slot to use. The session start comes with its readings;
-    /// the link, readings and commands stay with this controller.
+    /// What a watch needs to read this transmitter itself: its ID, lifetime
+    /// and the slot to use. Activation and session start come from the
+    /// transmitter, and are left out so that re-reading them, which can shift
+    /// them by a second, does not change the export. The link, readings and
+    /// commands stay with this controller.
     var sharedState: RawValue {
         var shared = G6CGMManagerState(
             transmitterID: transmitterID,
-            transmitterStartDate: transmitterStartDate,
             transmitterSlot: secondaryTransmitterSlot,
             transmitterExpiryInDays: transmitterExpiryInDays,
             sensorLifeDays: sensorLifeDays,
@@ -376,7 +377,6 @@ public struct G6CGMManagerState: RawRepresentable {
         }
         var state = G6CGMManagerState(
             transmitterID: passed.transmitterID,
-            transmitterStartDate: passed.transmitterStartDate,
             transmitterSlot: passed.transmitterSlot,
             transmitterExpiryInDays: passed.transmitterExpiryInDays,
             sensorLifeDays: passed.sensorLifeDays,

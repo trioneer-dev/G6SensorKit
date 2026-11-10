@@ -633,7 +633,9 @@ public final class G6CGMManager: CGMManager {
     }
 
     public var isInoperable: Bool {
-        if state.isTransmitterExpired || state.isSensorFailed {
+        // An expired transmitter keeps reading the session it is running;
+        // only once that has ended can it give no more readings.
+        if state.isSensorFailed || (state.isTransmitterExpired && !state.hasActiveSession) {
             return true
         }
         guard state.sensorStartDate != nil, let expiration = state.sensorExpirationDate else {

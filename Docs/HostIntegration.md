@@ -123,6 +123,34 @@ Slot values follow xDrip+ (`endByteStd`/`endByteAlt`) and xDrip4iOS, which
 found the third Anubis slot and uses separate slots for its Direct to Watch
 collection. Thanks to both projects.
 
+### Apple Watch (direct read)
+
+`G6CGMManager` conforms to LoopKit's `DeviceConfigurationSharing`, so a watch
+app can read the transmitter itself alongside the phone. Link the
+`G6SensorKit-watchOS` target into the watch extension; it builds the same
+sources under the same module name, against the host's `LoopKit-watchOS`.
+
+- The user turns on **Read on Apple Watch** in settings
+  (`watchDirectReadEnabled`, reported as `isConfigurationSharingEnabled`). The
+  row appears only when the host's `supportsWatchDirectRead(for:)` is `true`
+  and a paired watch has the app installed. Turning it on asks for
+  confirmation, with a warning for the slot the watch will take.
+- `exportConfiguration()` carries the transmitter ID, activation date,
+  reported lifetime, session length and the slot the watch must use:
+  `secondaryTransmitterSlot`, which is the Anubis extra slot (`0x03`) on
+  Anubis and the receiver-or-pump slot (`0x01`) otherwise, and never the slot
+  the phone uses. In passive mode the Dexcom app's `0x02` counts as the
+  phone's. A change of slot, mode or Anubis detection changes the export, so
+  the host rebuilds the watch's manager.
+- `init(adopting:localState:)` builds a direct-mode manager on that slot. It
+  only reads: commands are dropped, it keeps no Share credentials, and the
+  session start date comes from its readings.
+- `statusDidChange` is posted on the main queue whenever the manager's
+  observers are notified; `recheckAcquisition()` re-arms the connection for a
+  host woken in the background.
+
+Separate phone and watch slots follow xDrip4iOS's Direct to Watch.
+
 `providesBLEHeartbeat` is `true` in direct mode and `false` in passive mode:
 in passive the manufacturer's app drives the cadence, so the host's own fetch
 timer must keep ticking.

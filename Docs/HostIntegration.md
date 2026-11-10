@@ -81,8 +81,9 @@ Three LoopKit API generations exist across this ecosystem: upstream `dev`
 `CGMManagerStatus`), the tidepool-sync fork (`LoopQuantity`, `async`
 `acknowledgeAlert`, five-argument status), and Trio's `loopandlearn` pin.
 
-G6SensorKit currently targets the upstream-`dev`-shaped API, verified by
-building against `LoopKit/LoopKit`. Fork differences belong in `Common/`
+G6SensorKit targets the `next-dev`-shaped API that Trio's `dev` branch pins
+(`LoopQuantity`, `async` alert acknowledgement and deletion, `inSignalLoss`,
+`isInoperable`), verified by building against that pin. Fork differences belong in `Common/`
 shims — never in `G6SensorCore`, which imports no LoopKit at all. A CI matrix
 building against both hosts at pinned SHAs is the only reliable guard.
 
